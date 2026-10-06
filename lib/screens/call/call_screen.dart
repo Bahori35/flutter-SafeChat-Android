@@ -4,7 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../constants/app_colors.dart';
 import '../../models/call_model.dart';
 import '../../models/user_model.dart';
-import '../../services/signaling_service.dart';
+import '../../services/custom_signaling_service.dart';
 
 class CallScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -27,79 +27,31 @@ class CallScreen extends StatefulWidget {
 }
 
 class _CallScreenState extends State<CallScreen> {
-  final SignalingService _signaling = SignalingService();
+  final CustomSignalingService _signaling = CustomSignalingService();
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
 
   bool _isMuted = false;
   bool _isVideoOff = false;
-  bool _isSpeaker = true;
-  String _callStatusText = 'Bağlanıyor...';
-  String? _activeCallId;
+  String _callStatusText = 'Aranıyor...';
 
   @override
   void initState() {
     super.initState();
-    _initRenderersAndCall();
+    _initCall();
   }
 
-  void _initRenderersAndCall() async {
+  void _initCall() async {
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
 
     final isVideo = widget.callType == CallType.video;
     await _signaling.openUserMedia(_localRenderer, _remoteRenderer, isVideo: isVideo);
 
-    if (widget.isCaller) {
+    if (mounted) {
       setState(() {
-        _callStatusText = 'Çalıyor...';
+        _callStatusText = isVideo ? 'Görüntülü Görüşme Başlatıldı' : 'Sesli Görüşme Başlatıldı';
       });
-
-      _activeCallId = await _signaling.makeCall(
-        caller: widget.currentUser,
-        receiver: widget.peerUser,
-        callType: widget.callType,
-        localRenderer: _localRenderer,
-        remoteRenderer: _remoteRenderer,
-      );
-
-      // Listen for remote call status (e.g., rejected / ended)
-      _signaling.getCallStream(_activeCallId!).listen((doc) {
-        if (!doc.exists) return;
-        final data = doc.data() as Map<String, dynamic>?;
-        if (data == null) return;
-
-        final status = data['callStatus'];
-        if (status == CallStatus.accepted.name) {
-          setState(() {
-            _callStatusText = 'Görüşme Başladı';
-          });
-        } else if (status == CallStatus.ended.name || status == CallStatus.rejected.name) {
-          _hangUp();
-        }
-      });
-    } else {
-      // Receiver answers call
-      _activeCallId = widget.callId;
-      if (_activeCallId != null) {
-        await _signaling.answerCall(
-          callId: _activeCallId!,
-          localRenderer: _localRenderer,
-          remoteRenderer: _remoteRenderer,
-        );
-        setState(() {
-          _callStatusText = 'Görüşme Başladı';
-        });
-
-        _signaling.getCallStream(_activeCallId!).listen((doc) {
-          if (!doc.exists) return;
-          final data = doc.data() as Map<String, dynamic>?;
-          if (data == null) return;
-          if (data['callStatus'] == CallStatus.ended.name) {
-            _hangUp();
-          }
-        });
-      }
     }
   }
 
@@ -122,11 +74,13 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _switchCamera() {
-    Helper.switchCamera(_signaling.localStream!.getVideoTracks()[0]);
+    if (_signaling.localStream != null && _signaling.localStream!.getVideoTracks().isNotEmpty) {
+      Helper.switchCamera(_signaling.localStream!.getVideoTracks()[0]);
+    }
   }
 
   void _hangUp() async {
-    await _signaling.endCall(_activeCallId);
+    await _signaling.endCall();
     if (mounted) {
       Navigator.pop(context);
     }
@@ -136,7 +90,7 @@ class _CallScreenState extends State<CallScreen> {
   void dispose() {
     _localRenderer.dispose();
     _remoteRenderer.dispose();
-    _signaling.endCall(_activeCallId);
+    _signaling.endCall();
     super.dispose();
   }
 
@@ -151,39 +105,40 @@ class _CallScreenState extends State<CallScreen> {
           children: [
             // Video / Audio View
             if (isVideo) ...[
-              // Remote Fullscreen Video
+              // Remote/Local Fullscreen Video View
               Positioned.fill(
                 child: RTCVideoView(
-                  _remoteRenderer,
+                  _localRenderer,
+                  mirror: true,
                   objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                 ),
               ),
 
-              // Local Picture-in-Picture Video
-              Positioned(
-                right: 20,
-                top: 30,
-                width: 110,
-                height: 160,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.4),
-                        blurRadius: 10,
-                      )
-                    ],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: RTCVideoView(
-                    _localRenderer,
-                    mirror: true,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+              // Remote video PIP (Picture in Picture)
+              if (_remoteRenderer.srcObject != null)
+                Positioned(
+                  right: 20,
+                  top: 30,
+                  width: 110,
+                  height: 160,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.4),
+                          blurRadius: 10,
+                        )
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: RTCVideoView(
+                      _remoteRenderer,
+                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                    ),
                   ),
                 ),
-              ),
             ] else ...[
               // Audio Call UI
               Center(
