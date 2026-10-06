@@ -63,7 +63,7 @@ class NotificationService {
     required String callerName,
     required String callType,
   }) async {
-    const AndroidNotificationDetails androidCallDetails = AndroidNotificationDetails(
+    final AndroidNotificationDetails androidCallDetails = AndroidNotificationDetails(
       'whatsapp_system_call_ringtone_channel',
       'Gelen Telefon Aramaları',
       channelDescription: 'Telefonun kendi varsayılan arama zil sesi ile çalan arama kanalı',
@@ -72,7 +72,7 @@ class NotificationService {
       category: AndroidNotificationCategory.call,
       fullScreenIntent: true,
       audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-      sound: UriAndroidNotificationSound('content://settings/system/ringtone'),
+      sound: const UriAndroidNotificationSound('content://settings/system/ringtone'),
       playSound: true,
       enableVibration: true,
       vibrationPattern: Int64List.fromList([
@@ -83,9 +83,10 @@ class NotificationService {
       autoCancel: false,
     );
 
-    const NotificationDetails callNotificationDetails = NotificationDetails(
+    final NotificationDetails callNotificationDetails = NotificationDetails(
       android: androidCallDetails,
     );
+
 
     await _notificationsPlugin.show(
       id,
