@@ -51,6 +51,15 @@ class AuthWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     final authService = Provider.of<CustomAuthService>(context);
 
+    if (authService.isInitializing) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primaryLight),
+        ),
+      );
+    }
+
     if (authService.currentUser != null) {
       return const HomeScreen();
     } else {

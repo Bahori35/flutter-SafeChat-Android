@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 
 class CustomAuthService extends ChangeNotifier {
@@ -14,6 +15,55 @@ class CustomAuthService extends ChangeNotifier {
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
+
+  bool _isInitializing = true;
+  bool get isInitializing => _isInitializing;
+
+  CustomAuthService() {
+    _loadSavedUser();
+  }
+
+  // Auto-login from local storage (SharedPreferences)
+  Future<void> _loadSavedUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUserJson = prefs.getString('saved_user');
+      final savedToken = prefs.getString('saved_token');
+
+      if (savedUserJson != null && savedToken != null) {
+        final Map<String, dynamic> userMap = jsonDecode(savedUserJson);
+        _currentUser = UserModel.fromMap(userMap, userMap['uid'] ?? '0');
+        _token = savedToken;
+      }
+    } catch (e) {
+      debugPrint('[AUTH] Auto-login error: $e');
+    } finally {
+      _isInitializing = false;
+      notifyListeners();
+    }
+  }
+
+  // Save session to local storage
+  Future<void> _saveSession(UserModel user, String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('saved_user', jsonEncode(user.toMap()));
+      await prefs.setString('saved_token', token);
+    } catch (e) {
+      debugPrint('[AUTH] Save session error: $e');
+    }
+  }
+
+  // Clear saved session on logout
+  Future<void> _clearSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('saved_user');
+      await prefs.remove('saved_token');
+    } catch (e) {
+      debugPrint('[AUTH] Clear session error: $e');
+    }
+  }
 
   // 1. REGISTER API
   Future<String?> registerUser({
@@ -53,6 +103,7 @@ class CustomAuthService extends ChangeNotifier {
             photoUrl: data['user']['photoUrl'] ?? '',
             isOnline: true,
           );
+          await _saveSession(_currentUser!, _token!);
           _isLoading = false;
           notifyListeners();
           return null; // Success
@@ -109,6 +160,7 @@ class CustomAuthService extends ChangeNotifier {
             status: data['user']['status'] ?? 'Hey there! I am using this app.',
             isOnline: true,
           );
+          await _saveSession(_currentUser!, _token!);
           _isLoading = false;
           notifyListeners();
           return null; // Success
@@ -129,7 +181,8 @@ class CustomAuthService extends ChangeNotifier {
   }
 
   // 3. LOGOUT API
-  void signOut() {
+  Future<void> signOut() async {
+    await _clearSession();
     _currentUser = null;
     _token = null;
     notifyListeners();
