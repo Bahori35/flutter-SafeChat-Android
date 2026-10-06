@@ -176,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     height: 52,
                     child: ElevatedButton(
                       onPressed: authService.isLoading ? null : _handleLogin,
-                      style: ElevatedButton.styleKey.isEmpty ? null : ElevatedButton.styleFrom(
+                      style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryLight,
                         foregroundColor: Colors.white,
                         elevation: 4,
