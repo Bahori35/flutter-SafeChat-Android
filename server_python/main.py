@@ -235,17 +235,23 @@ async def send_message(sid, data):
     msg_type = data.get("type", "text")
 
     conn = get_db_connection()
+    sender_name = "Biri"
     with conn.cursor() as cursor:
         cursor.execute(
             "INSERT INTO messages (sender_id, receiver_id, content, message_type) VALUES (%s, %s, %s, %s)",
             (sender_id, receiver_id, content, msg_type)
         )
         msg_id = cursor.lastrowid
+        cursor.execute("SELECT display_name, username FROM users WHERE id = %s", (sender_id,))
+        sender_row = cursor.fetchone()
+        if sender_row:
+            sender_name = sender_row.get("display_name") or sender_row.get("username") or "Biri"
     conn.close()
 
     saved_message = {
         "id": msg_id,
         "senderId": sender_id,
+        "senderName": sender_name,
         "receiverId": receiver_id,
         "content": content,
         "type": msg_type,
@@ -257,6 +263,7 @@ async def send_message(sid, data):
     if receiver_sid:
         await sio.emit("receive_message", saved_message, to=receiver_sid)
     await sio.emit("message_sent", saved_message, to=sid)
+
 
 @sio.event
 async def call_user(sid, data):

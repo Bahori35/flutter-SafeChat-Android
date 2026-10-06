@@ -30,14 +30,18 @@ class UserModel {
       'photoUrl': photoUrl,
       'status': status,
       'isOnline': isOnline,
-      'lastSeen': lastSeen != null ? Timestamp.fromDate(lastSeen!) : FieldValue.serverTimestamp(),
+      'lastSeen': lastSeen?.toIso8601String(),
     };
   }
 
   factory UserModel.fromMap(Map<String, dynamic> map, String docId) {
     DateTime? parsedLastSeen;
-    if (map['lastSeen'] is Timestamp) {
-      parsedLastSeen = (map['lastSeen'] as Timestamp).toDate();
+    if (map['lastSeen'] != null) {
+      if (map['lastSeen'] is String) {
+        parsedLastSeen = DateTime.tryParse(map['lastSeen']);
+      } else if (map['lastSeen'] is Timestamp) {
+        parsedLastSeen = (map['lastSeen'] as Timestamp).toDate();
+      }
     }
 
     return UserModel(
@@ -52,3 +56,4 @@ class UserModel {
     );
   }
 }
+

@@ -56,10 +56,10 @@ class NotificationService {
     _isRinging = true;
 
     try {
-      // Loop a standard high-quality ringtone sound
       _ringtonePlayer.setReleaseMode(ReleaseMode.loop);
+      // Play a standard telephone / mobile phone ringing audio stream
       await _ringtonePlayer.play(
-        UrlSource('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'),
+        UrlSource('https://cdn.freesound.org/previews/218/218333_4056007-lq.mp3'),
       );
     } catch (_) {}
   }
@@ -72,3 +72,4 @@ class NotificationService {
     } catch (_) {}
   }
 }
+

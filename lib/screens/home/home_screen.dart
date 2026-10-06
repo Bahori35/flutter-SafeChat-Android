@@ -44,12 +44,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
         // Listen for live messages received while in HomeScreen
         _socketService.onMessageReceived = (message) {
+          String senderDisplayName = message.senderName ?? 'Yeni Mesaj';
+          try {
+            final senderObj = _users.firstWhere((u) => u.uid == message.senderId);
+            senderDisplayName = senderObj.displayName;
+          } catch (_) {}
+
           _notificationService.showMessageNotification(
             id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-            senderName: 'Yeni Mesaj',
+            senderName: senderDisplayName,
             messageContent: message.content,
           );
         };
+
 
         // Listen for incoming calls
         _socketService.onIncomingCall = (callData) {
