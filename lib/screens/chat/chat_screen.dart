@@ -5,7 +5,7 @@ import '../../constants/app_colors.dart';
 import '../../models/message_model.dart';
 import '../../models/user_model.dart';
 import '../../models/call_model.dart';
-import '../../services/chat_service.dart';
+import '../../services/custom_chat_service.dart';
 import '../call/call_screen.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -25,12 +25,24 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final ChatService _chatService = ChatService();
+  final CustomChatService _chatService = CustomChatService();
+  List<MessageModel> _messages = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _chatService.markMessagesAsRead(widget.currentUser.uid, widget.peerUser.uid);
+    _loadMessages();
+  }
+
+  void _loadMessages() async {
+    final messages = await _chatService.getMessages(widget.currentUser.uid, widget.peerUser.uid);
+    if (mounted) {
+      setState(() {
+        _messages = messages.reversed.toList();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -44,12 +56,18 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    _chatService.sendMessage(
+    final newMessage = MessageModel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
       senderId: widget.currentUser.uid,
       receiverId: widget.peerUser.uid,
-      messageContent: text,
-      type: MessageType.text,
+      content: text,
+      timestamp: DateTime.now(),
+      isRead: false,
     );
+
+    setState(() {
+      _messages.insert(0, newMessage);
+    });
 
     _messageController.clear();
   }
@@ -77,40 +95,33 @@ class _ChatScreenState extends State<ChatScreen> {
         leadingWidth: 32,
         titleSpacing: 0,
         elevation: 0,
-        title: StreamBuilder<UserModel>(
-          stream: _chatService.getUserStream(widget.peerUser.uid),
-          initialData: widget.peerUser,
-          builder: (context, snapshot) {
-            final user = snapshot.data ?? widget.peerUser;
-            return Row(
-              children: [
-                CircleAvatar(
-                  radius: 19,
-                  backgroundImage: CachedNetworkImageProvider(user.photoUrl),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user.displayName,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        user.isOnline ? 'Çevrimiçi' : 'Çevrimdışı',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: user.isOnline ? AppColors.primaryLight : AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 19,
+              backgroundImage: CachedNetworkImageProvider(widget.peerUser.photoUrl),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.peerUser.displayName,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            );
-          },
+                  Text(
+                    widget.peerUser.isOnline ? 'Çevrimiçi' : 'Çevrimdışı',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: widget.peerUser.isOnline ? AppColors.primaryLight : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
@@ -129,39 +140,28 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
-          // Message List Stream
+          // Message List
           Expanded(
-            child: StreamBuilder<List<MessageModel>>(
-              stream: _chatService.getMessagesStream(widget.currentUser.uid, widget.peerUser.uid),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator(color: AppColors.primaryLight));
-                }
-
-                final messages = snapshot.data!;
-
-                if (messages.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'Sohbete başlayın 👋',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  reverse: true,
-                  controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final message = messages[index];
-                    final isMe = message.senderId == widget.currentUser.uid;
-                    return _buildMessageBubble(message, isMe);
-                  },
-                );
-              },
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.primaryLight))
+                : _messages.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Sohbete başlayın 👋',
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+                        ),
+                      )
+                    : ListView.builder(
+                        reverse: true,
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) {
+                          final message = _messages[index];
+                          final isMe = message.senderId == widget.currentUser.uid;
+                          return _buildMessageBubble(message, isMe);
+                        },
+                      ),
           ),
 
           // Message Input Field
