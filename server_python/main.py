@@ -85,9 +85,9 @@ def init_db():
             );
             """)
         conn.close()
-        print("✅ MariaDB bağlantısı ve tablolar hazır!")
+        print("[OK] MariaDB baglantisi ve tablolar hazir!")
     except Exception as e:
-        print(f"⚠️ MariaDB başlatma uyarısı: {e}")
+        print(f"[UYARI] MariaDB baslatma uyarisi: {e}")
 
 init_db()
 
@@ -211,12 +211,12 @@ def get_messages(user1: int, user2: int):
 
 @sio.event
 async def connect(sid, environ):
-    print(f"🔌 Bağlantı: {sid}")
+    print(f"[SOCKET] Baglanti: {sid}")
 
 @sio.event
 async def join(sid, user_id):
     active_sockets[str(user_id)] = sid
-    print(f"👤 Kullanıcı bağlandı: ID {user_id}")
+    print(f"[USER] Kullanici baglandi: ID {user_id}")
     await sio.emit("user_status_change", {"userId": user_id, "isOnline": True})
 
 @sio.event
