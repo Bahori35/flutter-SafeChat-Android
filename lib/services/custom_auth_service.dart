@@ -4,9 +4,8 @@ import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
 
 class CustomAuthService extends ChangeNotifier {
-  // Replace with your local IP when testing on a physical phone (e.g. http://192.168.1.50:3000)
-  // For Android Emulator use: http://10.0.2.2:3000
-  static const String baseUrl = 'http://10.0.2.2:3000/api';
+  // Computer local Wi-Fi/Ethernet IP for physical phone connection
+  static const String baseUrl = 'http://192.168.1.32:3000/api';
 
   UserModel? _currentUser;
   UserModel? get currentUser => _currentUser;
