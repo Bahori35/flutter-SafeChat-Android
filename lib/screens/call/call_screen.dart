@@ -58,6 +58,8 @@ class _CallScreenState extends State<CallScreen> {
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
 
+    final isVideo = widget.callType == CallType.video;
+
     // Set initial audio output (Speakerphone on for video, earpiece for audio call)
     _isSpeaker = isVideo;
     Helper.setSpeakerphoneOn(_isSpeaker);
