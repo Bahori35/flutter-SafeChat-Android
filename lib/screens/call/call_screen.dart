@@ -38,6 +38,7 @@ class _CallScreenState extends State<CallScreen> {
 
   bool _isMuted = false;
   bool _isVideoOff = false;
+  bool _isSpeaker = true;
   String _callStatusText = 'Bağlanıyor...';
 
   final Map<String, dynamic> _iceServers = {
@@ -57,7 +58,9 @@ class _CallScreenState extends State<CallScreen> {
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
 
-    final isVideo = widget.callType == CallType.video;
+    // Set initial audio output (Speakerphone on for video, earpiece for audio call)
+    _isSpeaker = isVideo;
+    Helper.setSpeakerphoneOn(_isSpeaker);
 
     // 1. Get Local Camera / Audio
     try {
@@ -163,6 +166,13 @@ class _CallScreenState extends State<CallScreen> {
         });
       }
     }
+  }
+
+  void _toggleSpeaker() {
+    setState(() {
+      _isSpeaker = !_isSpeaker;
+    });
+    Helper.setSpeakerphoneOn(_isSpeaker);
   }
 
   void _toggleMic() {
@@ -337,6 +347,16 @@ class _CallScreenState extends State<CallScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
+                    // Speakerphone / Ahize Toggle
+                    IconButton(
+                      icon: Icon(
+                        _isSpeaker ? Icons.volume_up : Icons.volume_off,
+                        color: _isSpeaker ? AppColors.primaryLight : Colors.white,
+                        size: 28,
+                      ),
+                      onPressed: _toggleSpeaker,
+                    ),
+
                     // Mute Audio
                     IconButton(
                       icon: Icon(
