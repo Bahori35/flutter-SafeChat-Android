@@ -57,21 +57,22 @@ class NotificationService {
     } catch (_) {}
   }
 
-  // Show Full-Screen / Heads-up Incoming Call with System Default Ringtone and Continuous Vibration
+  // Show Full-Screen / Heads-up Incoming Call with Phone's System Default Ringtone
   Future<void> showIncomingCallNotification({
     required int id,
     required String callerName,
     required String callType,
   }) async {
-    final AndroidNotificationDetails androidCallDetails = AndroidNotificationDetails(
-      'whatsapp_calls_channel_v2',
-      'Gelen Aramalar',
-      channelDescription: 'Gelen sesli ve görüntülü aramalar',
+    const AndroidNotificationDetails androidCallDetails = AndroidNotificationDetails(
+      'whatsapp_system_call_ringtone_channel',
+      'Gelen Telefon Aramaları',
+      channelDescription: 'Telefonun kendi varsayılan arama zil sesi ile çalan arama kanalı',
       importance: Importance.max,
       priority: Priority.max,
       category: AndroidNotificationCategory.call,
       fullScreenIntent: true,
       audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+      sound: UriAndroidNotificationSound('content://settings/system/ringtone'),
       playSound: true,
       enableVibration: true,
       vibrationPattern: Int64List.fromList([
@@ -82,7 +83,7 @@ class NotificationService {
       autoCancel: false,
     );
 
-    final NotificationDetails callNotificationDetails = NotificationDetails(
+    const NotificationDetails callNotificationDetails = NotificationDetails(
       android: androidCallDetails,
     );
 
@@ -93,6 +94,7 @@ class NotificationService {
       callNotificationDetails,
     );
   }
+
 
   // Cancel Call Notification
   Future<void> cancelCallNotification(int id) async {
