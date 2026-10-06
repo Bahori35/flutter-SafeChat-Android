@@ -82,6 +82,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       photoUrl: callerData['photoUrl'] ?? '',
     );
 
+    final int callNotificationId = 9999;
+    _notificationService.showIncomingCallNotification(
+      id: callNotificationId,
+      callerName: callerUser.displayName,
+      callType: callTypeStr == 'video' ? 'Görüntülü' : 'Sesli',
+    );
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -115,6 +122,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     IconButton(
                       icon: const Icon(Icons.call_end, color: AppColors.callRed, size: 36),
                       onPressed: () {
+                        _notificationService.cancelCallNotification(callNotificationId);
                         _notificationService.stopRingtone();
                         _socketService.emitEndCall(callerUser.uid);
                         Navigator.pop(ctx);
@@ -127,6 +135,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         size: 36,
                       ),
                       onPressed: () {
+                        _notificationService.cancelCallNotification(callNotificationId);
                         _notificationService.stopRingtone();
                         Navigator.pop(ctx);
                         Navigator.push(
@@ -151,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         );
       },
     );
+
   }
 
   void _loadUsers() async {

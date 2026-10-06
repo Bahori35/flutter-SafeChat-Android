@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:audioplayers/audioplayers.dart';
+
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -50,6 +52,45 @@ class NotificationService {
     );
   }
 
+  // Show Full-Screen / Heads-up Incoming Call with System Default Ringtone
+  Future<void> showIncomingCallNotification({
+    required int id,
+    required String callerName,
+    required String callType,
+  }) async {
+    final AndroidNotificationDetails androidCallDetails = AndroidNotificationDetails(
+      'whatsapp_calls_channel',
+      'Gelen Aramalar',
+      channelDescription: 'Gelen sesli ve görüntülü aramalar',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.call,
+      fullScreenIntent: true,
+      audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 1000, 1000, 1000, 1000]),
+      ongoing: true,
+      autoCancel: false,
+    );
+
+    final NotificationDetails callNotificationDetails = NotificationDetails(
+      android: androidCallDetails,
+    );
+
+    await _notificationsPlugin.show(
+      id,
+      'Gelen Arama',
+      '$callerName sizi $callType arıyor...',
+      callNotificationDetails,
+    );
+  }
+
+  // Cancel Call Notification
+  Future<void> cancelCallNotification(int id) async {
+    await _notificationsPlugin.cancel(id);
+  }
+
   // Start Playing Incoming Call Ringtone
   Future<void> startRingtone() async {
     if (_isRinging) return;
@@ -57,7 +98,7 @@ class NotificationService {
 
     try {
       _ringtonePlayer.setReleaseMode(ReleaseMode.loop);
-      // Play a standard telephone / mobile phone ringing audio stream
+      // Fallback audio ringtone
       await _ringtonePlayer.play(
         UrlSource('https://cdn.freesound.org/previews/218/218333_4056007-lq.mp3'),
       );
@@ -72,4 +113,5 @@ class NotificationService {
     } catch (_) {}
   }
 }
+
 
