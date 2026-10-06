@@ -91,10 +91,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       callType: callTypeStr == 'video' ? 'Görüntülü' : 'Sesli',
     );
 
+    bool isDialogClosed = false;
+    BuildContext? dialogContext;
+
+    // If caller cancels before we answer, dismiss the dialog immediately!
+    _socketService.onCallEnded = () {
+      if (!isDialogClosed) {
+        isDialogClosed = true;
+        _notificationService.cancelCallNotification(callNotificationId);
+        _notificationService.stopRingtone();
+        if (dialogContext != null && Navigator.canPop(dialogContext!)) {
+          Navigator.pop(dialogContext!);
+        }
+      }
+    };
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
+        dialogContext = ctx;
         return Dialog(
           backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -124,6 +140,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     IconButton(
                       icon: const Icon(Icons.call_end, color: AppColors.callRed, size: 36),
                       onPressed: () {
+                        isDialogClosed = true;
                         _notificationService.cancelCallNotification(callNotificationId);
                         _notificationService.stopRingtone();
                         _socketService.emitEndCall(callerUser.uid);
@@ -137,6 +154,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         size: 36,
                       ),
                       onPressed: () {
+                        isDialogClosed = true;
                         _notificationService.cancelCallNotification(callNotificationId);
                         _notificationService.stopRingtone();
                         Navigator.pop(ctx);
@@ -162,6 +180,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         );
       },
     );
+
 
   }
 
