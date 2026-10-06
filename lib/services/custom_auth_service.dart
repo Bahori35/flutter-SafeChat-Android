@@ -33,32 +33,42 @@ class CustomAuthService extends ChangeNotifier {
           'password': password,
           'displayName': displayName.trim().isEmpty ? username : displayName.trim(),
         }),
-      );
+      ).timeout(const Duration(seconds: 10));
 
-      final data = jsonDecode(response.body);
+      dynamic data;
+      try {
+        data = jsonDecode(response.body);
+      } catch (_) {
+        data = null;
+      }
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        _token = data['token'];
-        _currentUser = UserModel(
-          uid: data['user']['id'].toString(),
-          username: data['user']['username'],
-          email: '${data['user']['username']}@custom.server',
-          displayName: data['user']['displayName'],
-          photoUrl: data['user']['photoUrl'] ?? '',
-          isOnline: true,
-        );
-        _isLoading = false;
-        notifyListeners();
-        return null; // Success
-      } else {
-        _isLoading = false;
-        notifyListeners();
-        return data['detail'] ?? data['error'] ?? 'Kayıt başarısız oldu.';
+        if (data != null && data['user'] != null) {
+          _token = data['token'];
+          _currentUser = UserModel(
+            uid: data['user']['id'].toString(),
+            username: data['user']['username'],
+            email: '${data['user']['username']}@custom.server',
+            displayName: data['user']['displayName'],
+            photoUrl: data['user']['photoUrl'] ?? '',
+            isOnline: true,
+          );
+          _isLoading = false;
+          notifyListeners();
+          return null; // Success
+        }
       }
+
+      _isLoading = false;
+      notifyListeners();
+      if (data != null && (data['detail'] != null || data['error'] != null)) {
+        return data['detail'] ?? data['error'];
+      }
+      return 'Sunucu Hatası (${response.statusCode}): Lütfen sunucunuzun açık ve port yönlendirmenin doğru olduğunu kontrol edin.';
     } catch (e) {
       _isLoading = false;
       notifyListeners();
-      return 'Sunucuya bağlanılamadı: $e';
+      return 'Sunucuya bağlanılamadı. Lütfen sunucunun (start_server.bat) açık olduğunu ve port 3000 yönlendirmesini kontrol edin.';
     }
   }
 
@@ -78,33 +88,43 @@ class CustomAuthService extends ChangeNotifier {
           'username': username.trim().toLowerCase(),
           'password': password,
         }),
-      );
+      ).timeout(const Duration(seconds: 10));
 
-      final data = jsonDecode(response.body);
+      dynamic data;
+      try {
+        data = jsonDecode(response.body);
+      } catch (_) {
+        data = null;
+      }
 
       if (response.statusCode == 200) {
-        _token = data['token'];
-        _currentUser = UserModel(
-          uid: data['user']['id'].toString(),
-          username: data['user']['username'],
-          email: '${data['user']['username']}@custom.server',
-          displayName: data['user']['displayName'],
-          photoUrl: data['user']['photoUrl'] ?? '',
-          status: data['user']['status'] ?? 'Hey there! I am using this app.',
-          isOnline: true,
-        );
-        _isLoading = false;
-        notifyListeners();
-        return null; // Success
-      } else {
-        _isLoading = false;
-        notifyListeners();
-        return data['detail'] ?? data['error'] ?? 'Kullanıcı adı veya şifre hatalı.';
+        if (data != null && data['user'] != null) {
+          _token = data['token'];
+          _currentUser = UserModel(
+            uid: data['user']['id'].toString(),
+            username: data['user']['username'],
+            email: '${data['user']['username']}@custom.server',
+            displayName: data['user']['displayName'],
+            photoUrl: data['user']['photoUrl'] ?? '',
+            status: data['user']['status'] ?? 'Hey there! I am using this app.',
+            isOnline: true,
+          );
+          _isLoading = false;
+          notifyListeners();
+          return null; // Success
+        }
       }
+
+      _isLoading = false;
+      notifyListeners();
+      if (data != null && (data['detail'] != null || data['error'] != null)) {
+        return data['detail'] ?? data['error'];
+      }
+      return 'Giriş Hatası (${response.statusCode}): Kullanıcı adı veya şifre hatalı.';
     } catch (e) {
       _isLoading = false;
       notifyListeners();
-      return 'Sunucuya bağlanılamadı: $e';
+      return 'Sunucuya bağlanılamadı. Lütfen sunucunun (start_server.bat) açık olduğunu kontrol edin.';
     }
   }
 
