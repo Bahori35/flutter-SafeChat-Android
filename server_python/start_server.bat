@@ -1,20 +1,22 @@
 @echo off
-chcp 65001 > nul
-title WhatsApp Clone - Python MariaDB Server
+setlocal enabledelayedexpansion
+
+title WhatsApp Clone Server
 
 echo ========================================================
-echo   WhatsApp Clone Python + MariaDB Sunucusu Başlatılıyor
+echo    WhatsApp Clone Python + MariaDB Server
 echo ========================================================
 echo.
 
 cd /d "%~dp0"
 
-echo [Gerekli Python paketleri kontrol ediliyor...]
-pip install -r requirements.txt
+echo [1/2] Gerekli Python kutuphaneleri yukleniyor...
+"C:\Program Files\PyManager\python.exe" -m pip install fastapi "uvicorn[standard]" pymysql cryptography passlib python-jose python-multipart "python-socketio>=5.11.2"
 
 echo.
-echo [Sunucu başlatılıyor -> http://localhost:3000]
+echo [2/2] Sunucu baslatiliyor -> http://localhost:3000
 echo.
-python main.py
+
+"C:\Program Files\PyManager\python.exe" main.py
 
 pause
