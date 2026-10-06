@@ -1,0 +1,163 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import '../models/message_model.dart';
+import '../models/call_model.dart';
+import '../models/user_model.dart';
+
+typedef OnMessageReceived = void Function(MessageModel message);
+typedef OnIncomingCall = void Function(Map<String, dynamic> callData);
+typedef OnCallAnswered = void Function(Map<String, dynamic> answerData);
+typedef OnIceCandidate = void Function(Map<String, dynamic> candidateData);
+typedef OnCallEnded = void Function();
+
+class SocketService {
+  static final SocketService _instance = SocketService._internal();
+  factory SocketService() => _instance;
+  SocketService._internal();
+
+  IO.Socket? socket;
+  String? _currentUserId;
+
+  OnMessageReceived? onMessageReceived;
+  OnIncomingCall? onIncomingCall;
+  OnCallAnswered? onCallAnswered;
+  OnIceCandidate? onIceCandidate;
+  OnCallEnded? onCallEnded;
+
+  // Initialize and connect socket to Python server
+  void initSocket(String userId) {
+    if (socket != null && socket!.connected && _currentUserId == userId) return;
+
+    _currentUserId = userId;
+    
+    // Connect to Python server Socket.io (Port 3000)
+    socket = IO.io(
+      'http://46.197.188.20:3000',
+      IO.OptionBuilder()
+          .setTransports(['websocket', 'polling'])
+          .enableAutoConnect()
+          .enableReconnection()
+          .build(),
+    );
+
+    socket!.onConnect((_) {
+      debugPrint('[SOCKET] Connected to Python server');
+      // Join room with current user ID
+      socket!.emit('join', userId);
+    });
+
+    socket!.on('receive_message', (data) {
+      debugPrint('[SOCKET] Received Message: $data');
+      if (onMessageReceived != null && data != null) {
+        final message = MessageModel(
+          id: data['id'].toString(),
+          senderId: data['senderId'].toString(),
+          receiverId: data['receiverId'].toString(),
+          content: data['content'] ?? '',
+          type: MessageType.text,
+          timestamp: DateTime.tryParse(data['timestamp'] ?? '') ?? DateTime.now(),
+          isRead: data['isRead'] == 1 || data['isRead'] == true,
+          mediaUrl: data['mediaUrl'],
+        );
+        onMessageReceived!(message);
+      }
+    });
+
+    socket!.on('incoming_call', (data) {
+      debugPrint('[SOCKET] Incoming Call: $data');
+      if (onIncomingCall != null && data != null) {
+        onIncomingCall!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('call_answered', (data) {
+      debugPrint('[SOCKET] Call Answered: $data');
+      if (onCallAnswered != null && data != null) {
+        onCallAnswered!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('ice_candidate', (data) {
+      debugPrint('[SOCKET] Ice Candidate: $data');
+      if (onIceCandidate != null && data != null) {
+        onIceCandidate!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('call_ended', (_) {
+      debugPrint('[SOCKET] Call Ended by peer');
+      if (onCallEnded != null) {
+        onCallEnded!();
+      }
+    });
+
+    socket!.onDisconnect((_) => debugPrint('[SOCKET] Disconnected'));
+  }
+
+  // Send real-time chat message
+  void sendMessage({
+    required String senderId,
+    required String receiverId,
+    required String content,
+    String type = 'text',
+  }) {
+    if (socket != null && socket!.connected) {
+      socket!.emit('send_message', {
+        'senderId': senderId,
+        'receiverId': receiverId,
+        'content': content,
+        'type': type,
+      });
+    }
+  }
+
+  // Emit WebRTC Call
+  void emitCall({
+    required UserModel caller,
+    required String receiverId,
+    required Map<String, dynamic> offer,
+    required String callType,
+  }) {
+    socket?.emit('call_user', {
+      'caller': {
+        'uid': caller.uid,
+        'username': caller.username,
+        'displayName': caller.displayName,
+        'photoUrl': caller.photoUrl,
+      },
+      'receiverId': receiverId,
+      'offer': offer,
+      'callType': callType,
+    });
+  }
+
+  // Emit WebRTC Answer
+  void emitAnswer({
+    required String callerId,
+    required Map<String, dynamic> answer,
+  }) {
+    socket?.emit('answer_call', {
+      'callerId': callerId,
+      'answer': answer,
+    });
+  }
+
+  // Emit ICE Candidate
+  void emitIceCandidate({
+    required String targetUserId,
+    required Map<String, dynamic> candidate,
+  }) {
+    socket?.emit('ice_candidate', {
+      'targetUserId': targetUserId,
+      'candidate': candidate,
+    });
+  }
+
+  // Emit End Call
+  void emitEndCall(String targetUserId) {
+    socket?.emit('end_call', {
+      'targetUserId': targetUserId,
+    });
+  }
+}

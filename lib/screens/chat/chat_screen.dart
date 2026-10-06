@@ -6,6 +6,7 @@ import '../../models/message_model.dart';
 import '../../models/user_model.dart';
 import '../../models/call_model.dart';
 import '../../services/custom_chat_service.dart';
+import '../../services/socket_service.dart';
 import '../call/call_screen.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -26,6 +27,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final CustomChatService _chatService = CustomChatService();
+  final SocketService _socketService = SocketService();
   List<MessageModel> _messages = [];
   bool _isLoading = true;
 
@@ -33,6 +35,17 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _loadMessages();
+
+    // Listen for live messages received from socket
+    _socketService.onMessageReceived = (message) {
+      if (message.senderId == widget.peerUser.uid) {
+        if (mounted) {
+          setState(() {
+            _messages.insert(0, message);
+          });
+        }
+      }
+    };
   }
 
   void _loadMessages() async {
@@ -65,6 +78,14 @@ class _ChatScreenState extends State<ChatScreen> {
       isRead: false,
     );
 
+    // 1. Emit live via Socket.io to peer & save in MariaDB
+    _socketService.sendMessage(
+      senderId: widget.currentUser.uid,
+      receiverId: widget.peerUser.uid,
+      content: text,
+    );
+
+    // 2. Add to local list
     setState(() {
       _messages.insert(0, newMessage);
     });

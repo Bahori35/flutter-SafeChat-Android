@@ -6,6 +6,7 @@ import '../../models/user_model.dart';
 import '../../models/call_model.dart';
 import '../../services/custom_auth_service.dart';
 import '../../services/custom_chat_service.dart';
+import '../../services/socket_service.dart';
 import '../chat/chat_screen.dart';
 import '../call/call_screen.dart';
 
@@ -19,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final CustomChatService _chatService = CustomChatService();
+  final SocketService _socketService = SocketService();
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   String _searchQuery = '';
@@ -29,7 +31,104 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadUsers();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authService = Provider.of<CustomAuthService>(context, listen: false);
+      final currentUser = authService.currentUser;
+      if (currentUser != null) {
+        // Connect Socket.io client
+        _socketService.initSocket(currentUser.uid);
+
+        // Listen for incoming calls
+        _socketService.onIncomingCall = (callData) {
+          _showIncomingCallDialog(callData, currentUser);
+        };
+
+        _loadUsers();
+      }
+    });
+  }
+
+  void _showIncomingCallDialog(Map<String, dynamic> callData, UserModel currentUser) {
+    final callerData = callData['caller'] as Map<String, dynamic>;
+    final callTypeStr = callData['callType'] ?? 'video';
+    final offer = Map<String, dynamic>.from(callData['offer']);
+
+    final callerUser = UserModel(
+      uid: callerData['uid'].toString(),
+      username: callerData['username'] ?? 'User',
+      email: '',
+      displayName: callerData['displayName'] ?? callerData['username'] ?? 'User',
+      photoUrl: callerData['photoUrl'] ?? '',
+    );
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleAvatar(
+                  radius: 40,
+                  backgroundImage: CachedNetworkImageProvider(callerUser.photoUrl),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  callerUser.displayName,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  callTypeStr == 'video' ? 'Gelen Görüntülü Arama...' : 'Gelen Sesli Arama...',
+                  style: const TextStyle(color: AppColors.primaryLight, fontSize: 14),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.call_end, color: AppColors.callRed, size: 36),
+                      onPressed: () {
+                        _socketService.emitEndCall(callerUser.uid);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        callTypeStr == 'video' ? Icons.videocam : Icons.call,
+                        color: AppColors.callGreen,
+                        size: 36,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CallScreen(
+                              currentUser: currentUser,
+                              peerUser: callerUser,
+                              callType: callTypeStr == 'video' ? CallType.video : CallType.audio,
+                              isCaller: false,
+                              incomingOffer: offer,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _loadUsers() async {
@@ -200,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.primaryLight,
         onPressed: () {
-          _tabController.animateTo(1); // Go to Users tab
+          _tabController.animateTo(1);
         },
         child: const Icon(Icons.message, color: Colors.white),
       ),
