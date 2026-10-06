@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
-import '../../services/auth_service.dart';
+import '../../services/custom_auth_service.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -26,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      final authService = Provider.of<AuthService>(context, listen: false);
+      final authService = Provider.of<CustomAuthService>(context, listen: false);
       final error = await authService.loginUser(
         username: _usernameController.text.trim(),
         password: _passwordController.text,
@@ -46,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context);
+    final authService = Provider.of<CustomAuthService>(context);
 
     return Scaffold(
       backgroundColor: AppColors.background,

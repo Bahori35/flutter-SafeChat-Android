@@ -9,18 +9,11 @@ import 'screens/home/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Firebase (make sure firebase_options.dart or google-services.json is added)
-  try {
-    await Firebase.initializeApp();
-  } catch (e) {
-    debugPrint('Firebase initialization note: $e');
-  }
 
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) => CustomAuthService()),
       ],
       child: const WhatsAppCloneApp(),
     ),
@@ -39,7 +32,6 @@ class WhatsAppCloneApp extends StatelessWidget {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppColors.background,
         primaryColor: AppColors.primary,
-        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
         colorScheme: const ColorScheme.dark(
           primary: AppColors.primaryLight,
           secondary: AppColors.primaryDark,
@@ -57,7 +49,7 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context);
+    final authService = Provider.of<CustomAuthService>(context);
 
     if (authService.currentUser != null) {
       return const HomeScreen();
