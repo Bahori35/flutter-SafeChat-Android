@@ -2,11 +2,11 @@ import os
 import pymysql
 import socketio
 import uvicorn
+import bcrypt
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
-from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
 
@@ -18,7 +18,15 @@ DB_NAME = os.getenv("DB_NAME", "chat_app_db")
 DB_PORT = int(os.getenv("DB_PORT", 3306))
 SECRET_KEY = os.getenv("JWT_SECRET", "super_secret_jwt_key_whatsapp_clone_2026")
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except Exception:
+        return False
 
 def get_db_connection():
     return pymysql.connect(
@@ -128,7 +136,7 @@ def register(req: RegisterRequest):
             conn.close()
             raise HTTPException(status_code=400, detail="Bu kullanıcı adı zaten alınmış.")
 
-        hashed_pw = pwd_context.hash(req.password)
+        hashed_pw = hash_password(req.password)
         name = req.displayName.strip() if req.displayName else clean_username
         photo_url = f"https://ui-avatars.com/api/?name={name}&background=075E54&color=fff"
 
@@ -159,7 +167,7 @@ def login(req: LoginRequest):
     with conn.cursor() as cursor:
         cursor.execute("SELECT * FROM users WHERE username = %s", (clean_username,))
         user = cursor.fetchone()
-        if not user or not pwd_context.verify(req.password, user["password_hash"]):
+        if not user or not verify_password(req.password, user["password_hash"]):
             conn.close()
             raise HTTPException(status_code=400, detail="Kullanıcı adı veya şifre hatalı.")
 
