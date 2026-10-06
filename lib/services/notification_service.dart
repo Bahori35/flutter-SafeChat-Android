@@ -1,7 +1,7 @@
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:vibration/vibration.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -51,20 +51,20 @@ class NotificationService {
       notificationDetails,
     );
 
-    // Quick vibration buzz for message
-    if (await Vibration.hasVibrator() ?? false) {
-      Vibration.vibrate(duration: 300);
-    }
+    // Haptic feedback
+    try {
+      HapticFeedback.vibrate();
+    } catch (_) {}
   }
 
-  // Show Full-Screen / Heads-up Incoming Call with System Default Ringtone
+  // Show Full-Screen / Heads-up Incoming Call with System Default Ringtone and Continuous Vibration
   Future<void> showIncomingCallNotification({
     required int id,
     required String callerName,
     required String callType,
   }) async {
     final AndroidNotificationDetails androidCallDetails = AndroidNotificationDetails(
-      'whatsapp_calls_channel',
+      'whatsapp_calls_channel_v2',
       'Gelen Aramalar',
       channelDescription: 'Gelen sesli ve görüntülü aramalar',
       importance: Importance.max,
@@ -74,6 +74,10 @@ class NotificationService {
       audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
       playSound: true,
       enableVibration: true,
+      vibrationPattern: Int64List.fromList([
+        0, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000,
+        1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000
+      ]),
       ongoing: true,
       autoCancel: false,
     );
@@ -96,20 +100,12 @@ class NotificationService {
     stopRingtone();
   }
 
-  // Start Playing Incoming Call Ringtone & Continuous Vibration
+  // Start Playing Incoming Call Ringtone
   Future<void> startRingtone() async {
     if (_isRinging) return;
     _isRinging = true;
 
     try {
-      // Continuous pattern vibration until call ends: [wait 500ms, vibrate 1000ms, pause 1000ms, repeat]
-      if (await Vibration.hasVibrator() ?? false) {
-        Vibration.vibrate(
-          pattern: [500, 1000, 1000, 1000, 1000, 1000, 1000, 1000],
-          repeat: 1, // Repeat indefinitely
-        );
-      }
-
       _ringtonePlayer.setReleaseMode(ReleaseMode.loop);
       await _ringtonePlayer.play(
         UrlSource('https://cdn.freesound.org/previews/218/218333_4056007-lq.mp3'),
@@ -117,15 +113,15 @@ class NotificationService {
     } catch (_) {}
   }
 
-  // Stop Ringtone & Cancel Vibration
+  // Stop Ringtone
   Future<void> stopRingtone() async {
     _isRinging = false;
     try {
-      Vibration.cancel();
       await _ringtonePlayer.stop();
     } catch (_) {}
   }
 }
+
 
 
 
