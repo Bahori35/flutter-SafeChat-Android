@@ -34,18 +34,31 @@ class _CallScreenState extends State<CallScreen> {
 
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
-  MediaStream? _remoteStream;
 
   bool _isMuted = false;
   bool _isVideoOff = false;
   bool _isSpeaker = true;
+  bool _hasRemoteStream = false;
   String _callStatusText = 'Bağlanıyor...';
+
+  final List<RTCIceCandidate> _pendingIceCandidates = [];
 
   final Map<String, dynamic> _iceServers = {
     'iceServers': [
+      {'urls': 'stun:stun.l.google.com:19302'},
       {'urls': 'stun:stun1.l.google.com:19302'},
       {'urls': 'stun:stun2.l.google.com:19302'},
-    ]
+      {'urls': 'stun:stun3.l.google.com:19302'},
+      {'urls': 'stun:stun4.l.google.com:19302'},
+    ],
+    'sdpSemantics': 'unified-plan',
+  };
+
+  final Map<String, dynamic> _config = {
+    'mandatory': {},
+    'optional': [
+      {'DtlsSrtpKeyAgreement': true},
+    ],
   };
 
   @override
@@ -60,39 +73,60 @@ class _CallScreenState extends State<CallScreen> {
 
     final isVideo = widget.callType == CallType.video;
 
-    // Set initial audio output (Speakerphone on for video, earpiece for audio call)
+    // 1. Audio Output Mode
     _isSpeaker = isVideo;
     Helper.setSpeakerphoneOn(_isSpeaker);
 
-    // 1. Get Local Camera / Audio
+    // 2. Capture Local Camera & Audio Stream
     try {
-      _localStream = await navigator.mediaDevices.getUserMedia({
-        'audio': true,
-        'video': isVideo ? {'facingMode': 'user'} : false,
-      });
+      final Map<String, dynamic> constraints = {
+        'audio': {
+          'echoCancellation': true,
+          'noiseSuppression': true,
+          'autoGainControl': true,
+        },
+        'video': isVideo
+            ? {
+                'facingMode': 'user',
+                'mandatory': {
+                  'minWidth': '640',
+                  'minHeight': '480',
+                  'minFrameRate': '30',
+                },
+                'optional': [],
+              }
+            : false,
+      };
+
+      _localStream = await navigator.mediaDevices.getUserMedia(constraints);
       _localRenderer.srcObject = _localStream;
     } catch (e) {
-      debugPrint('Media error: $e');
+      debugPrint('[WEBRTC] Media devices error: $e');
     }
 
-    // 2. Create Peer Connection
-    _peerConnection = await createPeerConnection(_iceServers);
+    // 3. Create RTCPeerConnection
+    _peerConnection = await createPeerConnection(_iceServers, _config);
 
+    // Track remote incoming audio & video tracks
     _peerConnection?.onTrack = (RTCTrackEvent event) {
+      debugPrint('[WEBRTC] Remote Track Received: ${event.track.kind}');
       if (event.streams.isNotEmpty) {
         setState(() {
           _remoteRenderer.srcObject = event.streams[0];
-          _remoteStream = event.streams[0];
+          _hasRemoteStream = true;
           _callStatusText = 'Görüşme Başladı';
         });
       }
     };
 
-    _localStream?.getTracks().forEach((track) {
-      _peerConnection?.addTrack(track, _localStream!);
-    });
+    // Add local tracks to PeerConnection
+    if (_localStream != null) {
+      for (var track in _localStream!.getTracks()) {
+        await _peerConnection?.addTrack(track, _localStream!);
+      }
+    }
 
-    // Send ICE candidates to peer
+    // Send local ICE candidates to peer via socket
     _peerConnection?.onIceCandidate = (RTCIceCandidate candidate) {
       _socketService.emitIceCandidate(
         targetUserId: widget.peerUser.uid,
@@ -100,17 +134,21 @@ class _CallScreenState extends State<CallScreen> {
       );
     };
 
-    // Socket Event Listeners
+    // Listen for peer ICE candidates
     _socketService.onIceCandidate = (candidateData) async {
-      final candidate = candidateData['candidate'];
-      if (candidate != null) {
-        await _peerConnection?.addCandidate(
-          RTCIceCandidate(
-            candidate['candidate'],
-            candidate['sdpMid'],
-            candidate['sdpMLineIndex'],
-          ),
+      final candidateMap = candidateData['candidate'];
+      if (candidateMap != null) {
+        final iceCandidate = RTCIceCandidate(
+          candidateMap['candidate'],
+          candidateMap['sdpMid'],
+          candidateMap['sdpMLineIndex'],
         );
+
+        if (_peerConnection != null && _peerConnection!.getRemoteDescription() != null) {
+          await _peerConnection?.addCandidate(iceCandidate);
+        } else {
+          _pendingIceCandidates.add(iceCandidate);
+        }
       }
     };
 
@@ -118,7 +156,7 @@ class _CallScreenState extends State<CallScreen> {
       _hangUp(notifyPeer: false);
     };
 
-    // 3. Initiate or Answer Call
+    // 4. Negotiate SDP Offer / Answer
     if (widget.isCaller) {
       setState(() {
         _callStatusText = 'Çalıyor...';
@@ -126,36 +164,53 @@ class _CallScreenState extends State<CallScreen> {
 
       _socketService.onCallAnswered = (answerData) async {
         final answer = answerData['answer'];
-        if (answer != null) {
-          await _peerConnection?.setRemoteDescription(
-            RTCSessionDescription(answer['sdp'], answer['type']),
-          );
+        if (answer != null && _peerConnection != null) {
+          final desc = RTCSessionDescription(answer['sdp'], answer['type']);
+          await _peerConnection?.setRemoteDescription(desc);
+
+          // Drain queued ICE candidates
+          for (var candidate in _pendingIceCandidates) {
+            await _peerConnection?.addCandidate(candidate);
+          }
+          _pendingIceCandidates.clear();
+
           setState(() {
             _callStatusText = 'Görüşme Başladı';
           });
         }
       };
 
-      RTCSessionDescription offer = await _peerConnection!.createOffer();
+      RTCSessionDescription offer = await _peerConnection!.createOffer({
+        'offerToReceiveAudio': 1,
+        'offerToReceiveVideo': isVideo ? 1 : 0,
+      });
       await _peerConnection!.setLocalDescription(offer);
 
       _socketService.emitCall(
         caller: widget.currentUser,
         receiverId: widget.peerUser.uid,
         offer: offer.toMap(),
-        callType: widget.callType == CallType.video ? 'video' : 'audio',
+        callType: isVideo ? 'video' : 'audio',
       );
     } else {
-      // Receiver: Answer incoming offer
+      // Receiver Mode: Answer the incoming offer
       if (widget.incomingOffer != null) {
-        await _peerConnection?.setRemoteDescription(
-          RTCSessionDescription(
-            widget.incomingOffer!['sdp'],
-            widget.incomingOffer!['type'],
-          ),
+        final desc = RTCSessionDescription(
+          widget.incomingOffer!['sdp'],
+          widget.incomingOffer!['type'],
         );
+        await _peerConnection?.setRemoteDescription(desc);
 
-        RTCSessionDescription answer = await _peerConnection!.createAnswer();
+        // Drain queued ICE candidates
+        for (var candidate in _pendingIceCandidates) {
+          await _peerConnection?.addCandidate(candidate);
+        }
+        _pendingIceCandidates.clear();
+
+        RTCSessionDescription answer = await _peerConnection!.createAnswer({
+          'offerToReceiveAudio': 1,
+          'offerToReceiveVideo': isVideo ? 1 : 0,
+        });
         await _peerConnection!.setLocalDescription(answer);
 
         _socketService.emitAnswer(
@@ -210,10 +265,7 @@ class _CallScreenState extends State<CallScreen> {
     await _localStream?.dispose();
     _localStream = null;
 
-    _remoteStream?.getTracks().forEach((track) => track.stop());
-    await _remoteStream?.dispose();
-    _remoteStream = null;
-
+    _remoteRenderer.srcObject = null;
     await _peerConnection?.close();
     _peerConnection = null;
 
@@ -241,39 +293,46 @@ class _CallScreenState extends State<CallScreen> {
           children: [
             // Video / Audio View
             if (isVideo) ...[
-              // Remote Video Fullscreen
+              // Remote Video (or local video full screen until remote joins)
               Positioned.fill(
-                child: RTCVideoView(
-                  _remoteRenderer,
-                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                ),
+                child: _hasRemoteStream
+                    ? RTCVideoView(
+                        _remoteRenderer,
+                        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                      )
+                    : RTCVideoView(
+                        _localRenderer,
+                        mirror: true,
+                        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                      ),
               ),
 
-              // Local Camera PIP
-              Positioned(
-                right: 20,
-                top: 30,
-                width: 110,
-                height: 160,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.4),
-                        blurRadius: 10,
-                      )
-                    ],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: RTCVideoView(
-                    _localRenderer,
-                    mirror: true,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+              // Local Camera PIP (Only when remote stream is active)
+              if (_hasRemoteStream)
+                Positioned(
+                  right: 20,
+                  top: 30,
+                  width: 110,
+                  height: 160,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.4),
+                          blurRadius: 10,
+                        )
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: RTCVideoView(
+                      _localRenderer,
+                      mirror: true,
+                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                    ),
                   ),
                 ),
-              ),
             ] else ...[
               // Audio Call UI
               Center(
