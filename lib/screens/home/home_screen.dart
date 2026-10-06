@@ -7,6 +7,7 @@ import '../../models/call_model.dart';
 import '../../services/custom_auth_service.dart';
 import '../../services/custom_chat_service.dart';
 import '../../services/socket_service.dart';
+import '../../services/notification_service.dart';
 import '../chat/chat_screen.dart';
 import '../call/call_screen.dart';
 
@@ -21,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late TabController _tabController;
   final CustomChatService _chatService = CustomChatService();
   final SocketService _socketService = SocketService();
+  final NotificationService _notificationService = NotificationService();
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   String _searchQuery = '';
@@ -31,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _notificationService.init();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authService = Provider.of<CustomAuthService>(context, listen: false);
@@ -39,8 +42,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         // Connect Socket.io client
         _socketService.initSocket(currentUser.uid);
 
+        // Listen for live messages received while in HomeScreen
+        _socketService.onMessageReceived = (message) {
+          _notificationService.showMessageNotification(
+            id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+            senderName: 'Yeni Mesaj',
+            messageContent: message.content,
+          );
+        };
+
         // Listen for incoming calls
         _socketService.onIncomingCall = (callData) {
+          _notificationService.startRingtone();
           _showIncomingCallDialog(callData, currentUser);
         };
 
@@ -95,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     IconButton(
                       icon: const Icon(Icons.call_end, color: AppColors.callRed, size: 36),
                       onPressed: () {
+                        _notificationService.stopRingtone();
                         _socketService.emitEndCall(callerUser.uid);
                         Navigator.pop(ctx);
                       },
@@ -106,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         size: 36,
                       ),
                       onPressed: () {
+                        _notificationService.stopRingtone();
                         Navigator.pop(ctx);
                         Navigator.push(
                           context,
