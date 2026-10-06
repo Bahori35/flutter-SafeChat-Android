@@ -64,9 +64,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           _showIncomingCallDialog(callData, currentUser);
         };
 
+        // Listen for real-time user online/offline status changes
+        _socketService.onUserStatusChange = (userId, isOnline) {
+          if (mounted) {
+            setState(() {
+              final index = _users.indexWhere((u) => u.uid == userId);
+              if (index != -1) {
+                _users[index] = _users[index].copyWith(isOnline: isOnline);
+              }
+            });
+          }
+        };
+
         _loadUsers();
       }
     });
+
   }
 
 

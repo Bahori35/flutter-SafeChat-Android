@@ -10,6 +10,7 @@ typedef OnIncomingCall = void Function(Map<String, dynamic> callData);
 typedef OnCallAnswered = void Function(Map<String, dynamic> answerData);
 typedef OnIceCandidate = void Function(Map<String, dynamic> candidateData);
 typedef OnCallEnded = void Function();
+typedef OnUserStatusChange = void Function(String userId, bool isOnline);
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
@@ -24,6 +25,8 @@ class SocketService {
   OnCallAnswered? onCallAnswered;
   OnIceCandidate? onIceCandidate;
   OnCallEnded? onCallEnded;
+  OnUserStatusChange? onUserStatusChange;
+
 
   // Initialize and connect socket to Python server
   void initSocket(String userId) {
@@ -92,8 +95,18 @@ class SocketService {
       }
     });
 
+    socket!.on('user_status_change', (data) {
+      debugPrint('[SOCKET] User status change: $data');
+      if (onUserStatusChange != null && data != null) {
+        final userId = data['userId']?.toString() ?? '';
+        final isOnline = data['isOnline'] == true || data['isOnline'] == 1;
+        onUserStatusChange!(userId, isOnline);
+      }
+    });
+
     socket!.onDisconnect((_) => debugPrint('[SOCKET] Disconnected'));
   }
+
 
   // Send real-time chat message
   void sendMessage({

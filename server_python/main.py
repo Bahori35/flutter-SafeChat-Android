@@ -198,6 +198,12 @@ def get_users(currentUserId: Optional[int] = 0):
         )
         users = cursor.fetchall()
     conn.close()
+
+    # Dynamically match online status from real-time connected sockets
+    for u in users:
+        uid_str = str(u["id"])
+        u["isOnline"] = uid_str in active_sockets
+
     return users
 
 @app.get("/api/messages/{user1}/{user2}")
@@ -225,7 +231,18 @@ async def connect(sid, environ):
 async def join(sid, user_id):
     active_sockets[str(user_id)] = sid
     print(f"[USER] Kullanici baglandi: ID {user_id}")
-    await sio.emit("user_status_change", {"userId": user_id, "isOnline": True})
+
+    # Update database
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE users SET is_online = 1 WHERE id = %s", (user_id,))
+        conn.close()
+    except Exception as e:
+        print(f"[DB ERR] {e}")
+
+    await sio.emit("user_status_change", {"userId": str(user_id), "isOnline": True})
+
 
 @sio.event
 async def send_message(sid, data):
@@ -307,8 +324,18 @@ async def disconnect(sid):
     for uid, s in list(active_sockets.items()):
         if s == sid:
             del active_sockets[uid]
-            await sio.emit("user_status_change", {"userId": uid, "isOnline": False})
+            print(f"[USER] Kullanici ayrildi: ID {uid}")
+            try:
+                conn = get_db_connection()
+                with conn.cursor() as cursor:
+                    cursor.execute("UPDATE users SET is_online = 0, last_seen = NOW() WHERE id = %s", (uid,))
+                conn.close()
+            except Exception as e:
+                print(f"[DB ERR] {e}")
+
+            await sio.emit("user_status_change", {"userId": str(uid), "isOnline": False})
             break
+
 
 if __name__ == "__main__":
     uvicorn.run("main:socket_app", host="0.0.0.0", port=3000, reload=True)

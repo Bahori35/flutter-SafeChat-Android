@@ -30,10 +30,12 @@ class _ChatScreenState extends State<ChatScreen> {
   final SocketService _socketService = SocketService();
   List<MessageModel> _messages = [];
   bool _isLoading = true;
+  late UserModel _peer;
 
   @override
   void initState() {
     super.initState();
+    _peer = widget.peerUser;
     _loadMessages();
 
     // Listen for live messages received from socket
@@ -46,7 +48,17 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
     };
+
+    // Listen for live status change of peer
+    _socketService.onUserStatusChange = (userId, isOnline) {
+      if (userId == widget.peerUser.uid && mounted) {
+        setState(() {
+          _peer = _peer.copyWith(isOnline: isOnline);
+        });
+      }
+    };
   }
+
 
   void _loadMessages() async {
     final messages = await _chatService.getMessages(widget.currentUser.uid, widget.peerUser.uid);
@@ -120,7 +132,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             CircleAvatar(
               radius: 19,
-              backgroundImage: CachedNetworkImageProvider(widget.peerUser.photoUrl),
+              backgroundImage: CachedNetworkImageProvider(_peer.photoUrl),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -128,15 +140,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.peerUser.displayName,
+                    _peer.displayName,
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    widget.peerUser.isOnline ? 'Çevrimiçi' : 'Çevrimdışı',
+                    _peer.isOnline ? 'Çevrimiçi' : 'Çevrimdışı',
                     style: TextStyle(
                       fontSize: 12,
-                      color: widget.peerUser.isOnline ? AppColors.primaryLight : AppColors.textSecondary,
+                      color: _peer.isOnline ? AppColors.primaryLight : AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -144,6 +156,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
+
         actions: [
           IconButton(
             icon: const Icon(Icons.videocam, color: AppColors.textPrimary),

@@ -51,9 +51,32 @@ class UserModel {
       displayName: map['displayName'] ?? map['username'] ?? 'User',
       photoUrl: map['photoUrl'] ?? '',
       status: map['status'] ?? 'Hey there! I am using this app.',
-      isOnline: map['isOnline'] ?? false,
+      isOnline: map['isOnline'] == true || map['isOnline'] == 1,
       lastSeen: parsedLastSeen,
     );
   }
+
+  UserModel copyWith({
+    String? uid,
+    String? username,
+    String? email,
+    String? displayName,
+    String? photoUrl,
+    String? status,
+    bool? isOnline,
+    DateTime? lastSeen,
+  }) {
+    return UserModel(
+      uid: uid ?? this.uid,
+      username: username ?? this.username,
+      email: email ?? this.email,
+      displayName: displayName ?? this.displayName,
+      photoUrl: photoUrl ?? this.photoUrl,
+      status: status ?? this.status,
+      isOnline: isOnline ?? this.isOnline,
+      lastSeen: lastSeen ?? this.lastSeen,
+    );
+  }
 }
+
 
