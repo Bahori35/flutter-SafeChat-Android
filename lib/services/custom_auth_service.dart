@@ -43,7 +43,26 @@ class CustomAuthService extends ChangeNotifier {
     }
   }
 
+  // Sync FCM Token to Python MariaDB Backend
+  Future<void> syncFcmToken(String fcmToken) async {
+    if (_currentUser == null) return;
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/users/fcm-token'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'userId': int.tryParse(_currentUser!.uid) ?? 0,
+          'fcmToken': fcmToken,
+        }),
+      ).timeout(const Duration(seconds: 5));
+      debugPrint('[FCM] Token sunucuya gonderildi!');
+    } catch (e) {
+      debugPrint('[FCM] Token gonderilemedi: $e');
+    }
+  }
+
   // Save session to local storage
+
   Future<void> _saveSession(UserModel user, String token) async {
     try {
       final prefs = await SharedPreferences.getInstance();

@@ -42,7 +42,6 @@ app.*.map.json
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
-/android/app/release
+# Secret Service Account Keys
+*firebase-adminsdk*.json
 
-# Widget Preview related
-.widget_preview/

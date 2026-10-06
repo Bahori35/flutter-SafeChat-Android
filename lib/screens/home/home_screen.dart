@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../constants/app_colors.dart';
 import '../../models/user_model.dart';
@@ -43,6 +44,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         // Connect Socket.io client
         _socketService.initSocket(currentUser.uid);
 
+        // Register FCM Push Notifications
+        _initFirebaseMessaging(authService);
+
         // Listen for live messages received while in HomeScreen
         _socketService.onMessageReceived = (message) {
           String senderDisplayName = message.senderName ?? 'Yeni Mesaj';
@@ -79,8 +83,34 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _loadUsers();
       }
     });
-
   }
+
+  void _initFirebaseMessaging(CustomAuthService authService) async {
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+      // Request notification permissions
+      NotificationSettings settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        String? token = await messaging.getToken();
+        if (token != null) {
+          authService.syncFcmToken(token);
+        }
+
+        messaging.onTokenRefresh.listen((newToken) {
+          authService.syncFcmToken(newToken);
+        });
+      }
+    } catch (e) {
+      debugPrint('[FCM] Error initializing messaging: $e');
+    }
+  }
+
 
 
 

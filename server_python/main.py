@@ -3,6 +3,8 @@ import pymysql
 import socketio
 import uvicorn
 import bcrypt
+import firebase_admin
+from firebase_admin import credentials, messaging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -17,6 +19,55 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "chat_app_db")
 DB_PORT = int(os.getenv("DB_PORT", 3306))
 SECRET_KEY = os.getenv("JWT_SECRET", "super_secret_jwt_key_whatsapp_clone_2026")
+
+# --- FIREBASE ADMIN INITIALIZATION ---
+firebase_initialized = False
+try:
+    key_path = os.path.join(os.path.dirname(__file__), "safechet-bildirim-firebase-adminsdk-fbsvc-9989ea95a3.json")
+    if os.path.exists(key_path):
+        cred = credentials.Certificate(key_path)
+        firebase_admin.initialize_app(cred)
+        firebase_initialized = True
+        print("[OK] Firebase Admin SDK basariyla yuklendi!")
+    else:
+        print(f"[UYARI] Firebase key dosyasi bulunamadi: {key_path}")
+except Exception as e:
+    print(f"[HATA] Firebase Admin baslatilamadi: {e}")
+
+def send_fcm_push(user_id: int, title: str, body: str, data_payload: dict = None):
+    if not firebase_initialized:
+        return
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT fcm_token FROM users WHERE id = %s", (user_id,))
+            row = cursor.fetchone()
+        conn.close()
+
+        if row and row.get("fcm_token"):
+            fcm_token = row["fcm_token"]
+            msg_data = {k: str(v) for k, v in (data_payload or {}).items()}
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title=title,
+                    body=body,
+                ),
+                data=msg_data,
+                android=messaging.AndroidConfig(
+                    priority="high",
+                    notification=messaging.AndroidNotification(
+                        sound="default",
+                        channel_id="whatsapp_calls_channel_v2" if msg_data.get("type") == "call" else "whatsapp_messages",
+                        click_action="FLUTTER_NOTIFICATION_CLICK"
+                    )
+                ),
+                token=fcm_token,
+            )
+            response = messaging.send(message)
+            print(f"[FCM] Push bildirimi gonderildi (ID: {user_id}): {response}")
+    except Exception as e:
+        print(f"[FCM HATA] Bildirim gonderilemedi: {e}")
+
 
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
@@ -58,11 +109,17 @@ def init_db():
                 password_hash VARCHAR(255) NOT NULL,
                 photo_url VARCHAR(255) DEFAULT '',
                 status VARCHAR(255) DEFAULT 'Hey there! I am using this app.',
+                fcm_token TEXT NULL,
                 is_online BOOLEAN DEFAULT FALSE,
                 last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
+
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN fcm_token TEXT NULL;")
+            except Exception:
+                pass
 
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS messages (
@@ -124,7 +181,20 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class FcmTokenRequest(BaseModel):
+    userId: int
+    fcmToken: str
+
 # --- REST API ---
+
+@app.post("/api/users/fcm-token")
+def update_fcm_token(req: FcmTokenRequest):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("UPDATE users SET fcm_token = %s WHERE id = %s", (req.fcmToken, req.userId))
+    conn.close()
+    return {"status": "success", "message": "FCM Token guncellendi"}
+
 
 @app.post("/api/auth/register")
 def register(req: RegisterRequest):
@@ -281,15 +351,44 @@ async def send_message(sid, data):
         await sio.emit("receive_message", saved_message, to=receiver_sid)
     await sio.emit("message_sent", saved_message, to=sid)
 
+    # Trigger FCM Push Notification if peer is in background / closed
+    send_fcm_push(
+        user_id=int(receiver_id),
+        title=f"Yeni Mesaj: {sender_name}",
+        body=content if msg_type == "text" else "Yeni bir medya mesajı aldınız.",
+        data_payload={
+            "type": "message",
+            "senderId": sender_id,
+            "senderName": sender_name,
+            "content": content,
+        }
+    )
+
 
 @sio.event
 async def call_user(sid, data):
     receiver_id = data.get("receiverId")
+    caller_data = data.get("caller", {})
+    caller_name = caller_data.get("displayName") or caller_data.get("username") or "Biri"
+    call_type_str = data.get("callType", "video")
+
     receiver_sid = active_sockets.get(str(receiver_id))
     if receiver_sid:
         await sio.emit("incoming_call", data, to=receiver_sid)
-    else:
-        await sio.emit("call_failed", {"reason": "Kullanıcı çevrimdışı"}, to=sid)
+
+    # Always trigger high-priority FCM wake-up call notification
+    send_fcm_push(
+        user_id=int(receiver_id),
+        title=f"Gelen { 'Görüntülü' if call_type_str == 'video' else 'Sesli' } Arama",
+        body=f"{caller_name} sizi arıyor...",
+        data_payload={
+            "type": "call",
+            "callerName": caller_name,
+            "callType": call_type_str,
+            "callerId": caller_data.get("uid", ""),
+        }
+    )
+
 
 @sio.event
 async def answer_call(sid, data):

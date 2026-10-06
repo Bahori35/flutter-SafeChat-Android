@@ -10,7 +10,14 @@ import 'screens/home/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('[FIREBASE] Init error: $e');
+  }
+
   runApp(
+
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => CustomAuthService()),
