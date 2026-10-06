@@ -283,10 +283,17 @@ async def ice_candidate(sid, data):
 
 @sio.event
 async def end_call(sid, data):
-    target_user_id = data.get("targetUserId")
-    target_sid = active_sockets.get(str(target_user_id))
-    if target_sid:
-        await sio.emit("call_ended", to=target_sid)
+    target_user_id = data.get("targetUserId") if isinstance(data, dict) else None
+    if target_user_id:
+        target_sid = active_sockets.get(str(target_user_id))
+        if target_sid:
+            print(f"[CALL] Arama sonlandirildi -> Hedef: {target_user_id}")
+            await sio.emit("call_ended", {}, to=target_sid)
+    else:
+        # Broadcast to others if specific target is not given
+        for uid, s in list(active_sockets.items()):
+            if s != sid:
+                await sio.emit("call_ended", {}, to=s)
 
 @sio.event
 async def disconnect(sid):

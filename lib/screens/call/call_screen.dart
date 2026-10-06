@@ -153,7 +153,10 @@ class _CallScreenState extends State<CallScreen> {
     };
 
     _socketService.onCallEnded = () {
-      _hangUp(notifyPeer: false);
+      debugPrint('[WEBRTC] Peer ended the call, closing call screen...');
+      if (mounted) {
+        _hangUp(notifyPeer: false);
+      }
     };
 
     // 4. Negotiate SDP Offer / Answer
@@ -256,29 +259,41 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
+  bool _isEnding = false;
+
   void _hangUp({bool notifyPeer = true}) async {
+    if (_isEnding) return;
+    _isEnding = true;
+
     if (notifyPeer) {
       _socketService.emitEndCall(widget.peerUser.uid);
     }
 
-    _localStream?.getTracks().forEach((track) => track.stop());
-    await _localStream?.dispose();
+    try {
+      _localStream?.getTracks().forEach((track) {
+        track.stop();
+      });
+      await _localStream?.dispose();
+    } catch (_) {}
     _localStream = null;
 
-    _remoteRenderer.srcObject = null;
-    await _peerConnection?.close();
+    try {
+      _localRenderer.srcObject = null;
+      _remoteRenderer.srcObject = null;
+      await _peerConnection?.close();
+    } catch (_) {}
     _peerConnection = null;
 
     if (mounted) {
-      Navigator.pop(context);
+      Navigator.of(context).pop();
     }
   }
 
   @override
   void dispose() {
+    _hangUp(notifyPeer: true);
     _localRenderer.dispose();
     _remoteRenderer.dispose();
-    _hangUp(notifyPeer: true);
     super.dispose();
   }
 
