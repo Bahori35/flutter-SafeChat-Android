@@ -1,0 +1,392 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
+import '../../constants/app_colors.dart';
+import '../../models/user_model.dart';
+import '../../models/call_model.dart';
+import '../../services/auth_service.dart';
+import '../../services/chat_service.dart';
+import '../../services/signaling_service.dart';
+import '../chat/chat_screen.dart';
+import '../call/call_screen.dart';
+import '../call/incoming_call_dialog.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late TabController _tabController;
+  final ChatService _chatService = ChatService();
+  final SignalingService _signalingService = SignalingService();
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearching = false;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _tabController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    if (state == AppLifecycleState.resumed) {
+      authService.setUserOnlineStatus(true);
+    } else {
+      authService.setUserOnlineStatus(false);
+    }
+  }
+
+  void _startAudioOrVideoCall(UserModel peerUser, CallType callType) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUser = authService.currentUser;
+    if (currentUser == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CallScreen(
+          currentUser: currentUser,
+          peerUser: peerUser,
+          callType: callType,
+          isCaller: true,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context);
+    final currentUser = authService.currentUser;
+
+    if (currentUser == null) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primaryLight),
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            backgroundColor: AppColors.surface,
+            elevation: 0,
+            title: _isSearching
+                ? TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    decoration: const InputDecoration(
+                      hintText: 'Kullanıcı adı veya isim ara...',
+                      hintStyle: TextStyle(color: AppColors.textSecondary),
+                      border: InputBorder.none,
+                    ),
+                    onChanged: (val) {
+                      setState(() {
+                        _searchQuery = val.trim();
+                      });
+                    },
+                  )
+                : const Text(
+                    'WhatsApp',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22,
+                    ),
+                  ),
+            actions: [
+              IconButton(
+                icon: Icon(
+                  _isSearching ? Icons.close : Icons.search,
+                  color: AppColors.textSecondary,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isSearching = !_isSearching;
+                    _searchQuery = '';
+                    _searchController.clear();
+                  });
+                },
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+                color: AppColors.surfaceLight,
+                onSelected: (val) {
+                  if (val == 'logout') {
+                    authService.signOut();
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  PopupMenuItem(
+                    value: 'profile',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person, color: AppColors.textPrimary, size: 20),
+                        const SizedBox(width: 10),
+                        Text(
+                          '@${currentUser.username}',
+                          style: const TextStyle(color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'logout',
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout, color: AppColors.callRed, size: 20),
+                        SizedBox(width: 10),
+                        Text(
+                          'Çıkış Yap',
+                          style: TextStyle(color: AppColors.callRed),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            bottom: TabBar(
+              controller: _tabController,
+              indicatorColor: AppColors.primaryLight,
+              indicatorWeight: 3.5,
+              labelColor: AppColors.primaryLight,
+              unselectedLabelColor: AppColors.textSecondary,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              tabs: const [
+                Tab(text: 'SOHBETLER'),
+                Tab(text: 'KİŞİLER'),
+                Tab(text: 'ARAMALAR'),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildChatsTab(currentUser),
+              _buildUsersTab(currentUser),
+              _buildCallsTab(currentUser),
+            ],
+          ),
+          floatingActionButton: FloatingActionButton(
+            backgroundColor: AppColors.primaryLight,
+            onPressed: () {
+              _tabController.animateTo(1); // Go to Users tab
+            },
+            child: const Icon(Icons.message, color: Colors.white),
+          ),
+        ),
+
+        // Global incoming call listener overlay
+        StreamBuilder<CallModel?>(
+          stream: _signalingService.getIncomingCallsStream(currentUser.uid),
+          builder: (context, snapshot) {
+            if (snapshot.hasData && snapshot.data != null) {
+              final call = snapshot.data!;
+              return IncomingCallDialog(
+                call: call,
+                currentUser: currentUser,
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+      ],
+    );
+  }
+
+  // Chats Tab
+  Widget _buildChatsTab(UserModel currentUser) {
+    return StreamBuilder<List<UserModel>>(
+      stream: _chatService.getUsersStream(currentUser.uid),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator(color: AppColors.primaryLight));
+        }
+
+        var users = snapshot.data!;
+        if (_searchQuery.isNotEmpty) {
+          users = users
+              .where((u) =>
+                  u.displayName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                  u.username.toLowerCase().contains(_searchQuery.toLowerCase()))
+              .toList();
+        }
+
+        if (users.isEmpty) {
+          return const Center(
+            child: Text(
+              'Henüz sohbet bulunmuyor.\nKişiler sekmesinden birini seçip konuşmaya başlayın!',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+            ),
+          );
+        }
+
+        return ListView.separated(
+          itemCount: users.length,
+          separatorBuilder: (ctx, i) => const Divider(color: AppColors.surface, height: 1, indent: 76),
+          itemBuilder: (context, index) {
+            final user = users[index];
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              leading: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: AppColors.surfaceLight,
+                    backgroundImage: CachedNetworkImageProvider(user.photoUrl),
+                  ),
+                  if (user.isOnline)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.background, width: 2),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              title: Text(
+                user.displayName,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              subtitle: Text(
+                user.status,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.call, color: AppColors.primaryLight, size: 22),
+                    onPressed: () => _startAudioOrVideoCall(user, CallType.audio),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.videocam, color: AppColors.primaryLight, size: 24),
+                    onPressed: () => _startAudioOrVideoCall(user, CallType.video),
+                  ),
+                ],
+              ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatScreen(peerUser: user, currentUser: currentUser),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Users Tab
+  Widget _buildUsersTab(UserModel currentUser) {
+    return StreamBuilder<List<UserModel>>(
+      stream: _chatService.getUsersStream(currentUser.uid),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator(color: AppColors.primaryLight));
+        }
+
+        var users = snapshot.data!;
+        if (_searchQuery.isNotEmpty) {
+          users = users
+              .where((u) =>
+                  u.displayName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                  u.username.toLowerCase().contains(_searchQuery.toLowerCase()))
+              .toList();
+        }
+
+        return ListView.builder(
+          itemCount: users.length,
+          itemBuilder: (context, index) {
+            final user = users[index];
+            return ListTile(
+              leading: CircleAvatar(
+                radius: 24,
+                backgroundImage: CachedNetworkImageProvider(user.photoUrl),
+              ),
+              title: Text(user.displayName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+              subtitle: Text('@${user.username} • ${user.isOnline ? "Çevrimiçi" : "Çevrimdışı"}',
+                  style: TextStyle(
+                    color: user.isOnline ? AppColors.primaryLight : AppColors.textSecondary,
+                    fontSize: 13,
+                  )),
+              trailing: IconButton(
+                icon: const Icon(Icons.chat, color: AppColors.primaryLight),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChatScreen(peerUser: user, currentUser: currentUser),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Calls Tab
+  Widget _buildCallsTab(UserModel currentUser) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.video_call_rounded, size: 70, color: AppColors.textMuted),
+          const SizedBox(height: 16),
+          const Text(
+            'Arkadaşlarınla sesli veya görüntülü konuş!',
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Herhangi bir kişinin yanındaki arama butonuna basarak\nanında HD WebRTC görüşmesi başlatabilirsiniz.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+}

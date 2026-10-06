@@ -1,0 +1,43 @@
+name: flutter_whatsapp_clone
+description: "A WhatsApp-like Voice/Video Calling and Messaging Application built with Flutter & Firebase."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Firebase Core & Services
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.4
+  firebase_storage: ^12.3.2
+
+  # WebRTC & Signaling for Audio/Video Calls
+  flutter_webrtc: ^0.11.7
+  permission_handler: ^11.3.1
+
+  # State Management & Utilities
+  provider: ^6.1.2
+  intl: ^0.20.3
+  uuid: ^4.5.1
+  cached_network_image: ^3.4.1
+  image_picker: ^1.1.2
+
+  # UI / Icons & Styling
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  font_awesome_flutter: ^10.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
