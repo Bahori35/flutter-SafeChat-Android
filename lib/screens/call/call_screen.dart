@@ -6,6 +6,8 @@ import '../../constants/app_colors.dart';
 import '../../models/call_model.dart';
 import '../../models/user_model.dart';
 import '../../services/socket_service.dart';
+import '../../services/notification_service.dart';
+
 
 class CallScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -265,9 +267,13 @@ class _CallScreenState extends State<CallScreen> {
     if (_isEnding) return;
     _isEnding = true;
 
+    NotificationService().stopRingtone();
+    NotificationService().cancelCallNotification(9999);
+
     if (notifyPeer) {
       _socketService.emitEndCall(widget.peerUser.uid);
     }
+
 
     try {
       _localStream?.getTracks().forEach((track) {

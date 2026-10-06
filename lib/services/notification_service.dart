@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:audioplayers/audioplayers.dart';
-
+import 'package:vibration/vibration.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -50,6 +50,11 @@ class NotificationService {
       messageContent,
       notificationDetails,
     );
+
+    // Quick vibration buzz for message
+    if (await Vibration.hasVibrator() ?? false) {
+      Vibration.vibrate(duration: 300);
+    }
   }
 
   // Show Full-Screen / Heads-up Incoming Call with System Default Ringtone
@@ -69,7 +74,6 @@ class NotificationService {
       audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
       playSound: true,
       enableVibration: true,
-      vibrationPattern: Int64List.fromList([0, 1000, 1000, 1000, 1000]),
       ongoing: true,
       autoCancel: false,
     );
@@ -89,29 +93,39 @@ class NotificationService {
   // Cancel Call Notification
   Future<void> cancelCallNotification(int id) async {
     await _notificationsPlugin.cancel(id);
+    stopRingtone();
   }
 
-  // Start Playing Incoming Call Ringtone
+  // Start Playing Incoming Call Ringtone & Continuous Vibration
   Future<void> startRingtone() async {
     if (_isRinging) return;
     _isRinging = true;
 
     try {
+      // Continuous pattern vibration until call ends: [wait 500ms, vibrate 1000ms, pause 1000ms, repeat]
+      if (await Vibration.hasVibrator() ?? false) {
+        Vibration.vibrate(
+          pattern: [500, 1000, 1000, 1000, 1000, 1000, 1000, 1000],
+          repeat: 1, // Repeat indefinitely
+        );
+      }
+
       _ringtonePlayer.setReleaseMode(ReleaseMode.loop);
-      // Fallback audio ringtone
       await _ringtonePlayer.play(
         UrlSource('https://cdn.freesound.org/previews/218/218333_4056007-lq.mp3'),
       );
     } catch (_) {}
   }
 
-  // Stop Ringtone
+  // Stop Ringtone & Cancel Vibration
   Future<void> stopRingtone() async {
     _isRinging = false;
     try {
+      Vibration.cancel();
       await _ringtonePlayer.stop();
     } catch (_) {}
   }
 }
+
 
 

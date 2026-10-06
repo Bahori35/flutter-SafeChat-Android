@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import '../../constants/app_colors.dart';
 import '../../models/user_model.dart';
 import '../../models/call_model.dart';
@@ -10,6 +11,23 @@ import '../../services/socket_service.dart';
 import '../../services/notification_service.dart';
 import '../chat/chat_screen.dart';
 import '../call/call_screen.dart';
+
+// Top-level callback for background service
+@pragma('vm:entry-point')
+void startCallback() {
+  FlutterForegroundTask.setTaskHandler(FirstTaskHandler());
+}
+
+class FirstTaskHandler extends TaskHandler {
+  @override
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {}
+
+  @override
+  void onRepeatEvent(DateTime timestamp) {}
+
+  @override
+  Future<void> onDestroy(DateTime timestamp) async {}
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _notificationService.init();
+    _initForegroundTask();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authService = Provider.of<CustomAuthService>(context, listen: false);
@@ -57,7 +76,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           );
         };
 
-
         // Listen for incoming calls
         _socketService.onIncomingCall = (callData) {
           _notificationService.startRingtone();
@@ -68,6 +86,36 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       }
     });
   }
+
+  void _initForegroundTask() {
+    FlutterForegroundTask.init(
+      androidNotificationOptions: AndroidNotificationOptions(
+        channelId: 'foreground_service',
+        channelName: 'WhatsApp Arka Plan Servisi',
+        channelDescription: 'Mesaj ve arama bildirimlerini arka planda anında almak için çalışır.',
+        channelImportance: NotificationChannelImportance.LOW,
+        priority: NotificationPriority.LOW,
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(
+        showNotification: false,
+        playSound: false,
+      ),
+      foregroundTaskOptions: ForegroundTaskOptions(
+        eventAction: ForegroundTaskEventAction.repeat(5000),
+        autoRunOnBoot: true,
+        allowWakeLock: true,
+        allowWifiLock: true,
+      ),
+    );
+
+    FlutterForegroundTask.startService(
+      serviceId: 256,
+      notificationTitle: 'WhatsApp Servisi Aktif',
+      notificationText: 'Gelen mesaj ve aramalar takip ediliyor',
+      callback: startCallback,
+    );
+  }
+
 
   void _showIncomingCallDialog(Map<String, dynamic> callData, UserModel currentUser) {
     final callerData = callData['caller'] as Map<String, dynamic>;
