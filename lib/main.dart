@@ -7,17 +7,77 @@ import 'services/custom_auth_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/notification_service.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    await Firebase.initializeApp();
+    final notificationService = NotificationService();
+    await notificationService.init();
+
+    final data = message.data;
+    final msgType = data['type'] ?? 'message';
+
+    if (msgType == 'call') {
+      final callerName = data['callerName'] ?? 'Biri';
+      final callType = data['callType'] == 'video' ? 'Görüntülü' : 'Sesli';
+      await notificationService.showIncomingCallNotification(
+        id: 9999,
+        callerName: callerName,
+        callType: callType,
+      );
+    } else {
+      final senderName = data['senderName'] ?? message.notification?.title ?? 'Yeni Mesaj';
+      final content = data['content'] ?? message.notification?.body ?? 'Mesaj içeriği';
+      await notificationService.showMessageNotification(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        senderName: senderName,
+        messageContent: content,
+      );
+    }
+  } catch (e) {
+    debugPrint('[FCM BG HANDLER] Hata: $e');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
     await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Foreground message listener
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final data = message.data;
+      final msgType = data['type'] ?? 'message';
+      final notificationService = NotificationService();
+
+      if (msgType == 'call') {
+        final callerName = data['callerName'] ?? 'Biri';
+        final callType = data['callType'] == 'video' ? 'Görüntülü' : 'Sesli';
+        notificationService.showIncomingCallNotification(
+          id: 9999,
+          callerName: callerName,
+          callType: callType,
+        );
+      } else {
+        final senderName = data['senderName'] ?? message.notification?.title ?? 'Yeni Mesaj';
+        final content = data['content'] ?? message.notification?.body ?? 'Mesaj içeriği';
+        notificationService.showMessageNotification(
+          id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+          senderName: senderName,
+          messageContent: content,
+        );
+      }
+    });
   } catch (e) {
     debugPrint('[FIREBASE] Init error: $e');
   }
 
   runApp(
-
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => CustomAuthService()),

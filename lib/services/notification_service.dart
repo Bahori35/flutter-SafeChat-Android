@@ -21,6 +21,35 @@ class NotificationService {
     );
 
     await _notificationsPlugin.initialize(initSettings);
+
+    // Create Notification Channels for Android 8.0+
+    final androidImplementation = _notificationsPlugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+
+    if (androidImplementation != null) {
+      await androidImplementation.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'whatsapp_messages',
+          'Mesajlar',
+          description: 'Gelen anlık sohbet mesajları',
+          importance: Importance.max,
+          enableVibration: true,
+          playSound: true,
+        ),
+      );
+
+      await androidImplementation.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'whatsapp_system_call_ringtone_channel',
+          'Gelen Telefon Aramaları',
+          description: 'Telefonun kendi varsayılan arama zil sesi ile çalan arama kanalı',
+          importance: Importance.max,
+          sound: UriAndroidNotificationSound('content://settings/system/ringtone'),
+          playSound: true,
+          enableVibration: true,
+        ),
+      );
+    }
   }
 
   // Show Heads-up Notification for Incoming Messages

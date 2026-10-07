@@ -57,7 +57,7 @@ def send_fcm_push(user_id: int, title: str, body: str, data_payload: dict = None
                     priority="high",
                     notification=messaging.AndroidNotification(
                         sound="default",
-                        channel_id="whatsapp_calls_channel_v2" if msg_data.get("type") == "call" else "whatsapp_messages",
+                        channel_id="whatsapp_system_call_ringtone_channel" if msg_data.get("type") == "call" else "whatsapp_messages",
                         click_action="FLUTTER_NOTIFICATION_CLICK"
                     )
                 ),
