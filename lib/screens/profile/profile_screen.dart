@@ -1,0 +1,286 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../constants/app_colors.dart';
+import '../../services/custom_auth_service.dart';
+
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameController;
+  late TextEditingController _statusController;
+  late TextEditingController _photoController;
+
+  // Preset avatar choices
+  final List<String> _avatarPresets = [
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400',
+    'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=400',
+    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final user = Provider.of<CustomAuthService>(context, listen: false).currentUser;
+    _nameController = TextEditingController(text: user?.displayName ?? '');
+    _statusController = TextEditingController(text: user?.status ?? 'Hey there! I am using this app.');
+    _photoController = TextEditingController(text: user?.photoUrl ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _statusController.dispose();
+    _photoController.dispose();
+    super.dispose();
+  }
+
+  void _saveProfile() async {
+    if (_formKey.currentState!.validate()) {
+      final authService = Provider.of<CustomAuthService>(context, listen: false);
+      final error = await authService.updateProfile(
+        displayName: _nameController.text.trim(),
+        photoUrl: _photoController.text.trim(),
+        status: _statusController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      if (error == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profil başarıyla güncellendi!'),
+            backgroundColor: AppColors.primaryLight,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: AppColors.callRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showAvatarPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Bir Profil Fotoğrafı Seçin',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 16),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                itemCount: _avatarPresets.length,
+                itemBuilder: (context, index) {
+                  final url = _avatarPresets[index];
+                  return InkWell(
+                    onTap: () {
+                      setState(() {
+                        _photoController.text = url;
+                      });
+                      Navigator.pop(ctx);
+                    },
+                    child: CircleAvatar(
+                      backgroundImage: CachedNetworkImageProvider(url),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authService = Provider.of<CustomAuthService>(context);
+    final user = authService.currentUser;
+
+    final currentPhoto = _photoController.text.isNotEmpty
+        ? _photoController.text
+        : (user?.photoUrl ?? '');
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        title: const Text('Profili Düzenle', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: authService.isLoading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.primaryLight, strokeWidth: 2))
+                : const Icon(Icons.check, color: AppColors.primaryLight),
+            onPressed: authService.isLoading ? null : _saveProfile,
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              // Avatar Preview & Change Button
+              Center(
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 56,
+                      backgroundColor: AppColors.surfaceLight,
+                      backgroundImage: currentPhoto.isNotEmpty
+                          ? CachedNetworkImageProvider(currentPhoto)
+                          : null,
+                      child: currentPhoto.isEmpty
+                          ? const Icon(Icons.person, size: 56, color: AppColors.textSecondary)
+                          : null,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _showAvatarPicker,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: AppColors.primaryLight,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: _showAvatarPicker,
+                icon: const Icon(Icons.photo_library, color: AppColors.primaryLight, size: 18),
+                label: const Text('Fotoğraf Değiştir / Seç', style: TextStyle(color: AppColors.primaryLight)),
+              ),
+              const SizedBox(height: 24),
+
+              // Username info (Read-only)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.alternate_email, color: AppColors.textSecondary),
+                title: const Text('Kullanıcı Adı', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                subtitle: Text('@${user?.username ?? ""}', style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              const Divider(color: AppColors.surface),
+
+              // Display Name Field
+              TextFormField(
+                controller: _nameController,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: const InputDecoration(
+                  labelText: 'İsim (Görünen Ad)',
+                  labelStyle: TextStyle(color: AppColors.primaryLight),
+                  prefixIcon: Icon(Icons.person_outline, color: AppColors.primaryLight),
+                  border: UnderlineInputBorder(),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.surfaceLight)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryLight, width: 2)),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Lütfen bir isim girin';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+
+              // Status / About Field
+              TextFormField(
+                controller: _statusController,
+                style: const TextStyle(color: AppColors.textPrimary),
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Hakkımda / Durum',
+                  labelStyle: TextStyle(color: AppColors.primaryLight),
+                  prefixIcon: Icon(Icons.info_outline, color: AppColors.primaryLight),
+                  border: UnderlineInputBorder(),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.surfaceLight)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryLight, width: 2)),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Custom Image URL Field (Optional)
+              TextFormField(
+                controller: _photoController,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                onChanged: (val) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'Özel Fotoğraf Linki (URL)',
+                  hintText: 'https://...',
+                  hintStyle: TextStyle(color: AppColors.textSecondary),
+                  labelStyle: TextStyle(color: AppColors.textSecondary),
+                  prefixIcon: Icon(Icons.link, color: AppColors.textSecondary),
+                  border: UnderlineInputBorder(),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.surfaceLight)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryLight, width: 2)),
+                ),
+              ),
+              const SizedBox(height: 36),
+
+              // Save Button
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryLight,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: authService.isLoading ? null : _saveProfile,
+                  child: authService.isLoading
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('KAYDET', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

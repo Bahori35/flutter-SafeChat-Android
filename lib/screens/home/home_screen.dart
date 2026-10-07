@@ -14,6 +14,7 @@ import '../../services/socket_service.dart';
 import '../../services/notification_service.dart';
 import '../chat/chat_screen.dart';
 import '../call/call_screen.dart';
+import '../profile/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -363,7 +364,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
             color: AppColors.surfaceLight,
             onSelected: (val) {
-              if (val == 'logout') {
+              if (val == 'profile') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+              } else if (val == 'logout') {
                 authService.signOut();
               }
             },
@@ -372,11 +378,24 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 value: 'profile',
                 child: Row(
                   children: [
-                    const Icon(Icons.person, color: AppColors.textPrimary, size: 20),
+                    CircleAvatar(
+                      radius: 12,
+                      backgroundImage: CachedNetworkImageProvider(currentUser.photoUrl),
+                    ),
                     const SizedBox(width: 10),
-                    Text(
-                      '@${currentUser.username}',
-                      style: const TextStyle(color: AppColors.textPrimary),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          currentUser.displayName,
+                          style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          'Profili Düzenle',
+                          style: const TextStyle(color: AppColors.primaryLight, fontSize: 11),
+                        ),
+                      ],
                     ),
                   ],
                 ),

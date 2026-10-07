@@ -202,7 +202,55 @@ class CustomAuthService extends ChangeNotifier {
     }
   }
 
-  // 3. LOGOUT API
+  // 3. UPDATE PROFILE API
+  Future<String?> updateProfile({
+    required String displayName,
+    required String photoUrl,
+    required String status,
+  }) async {
+    if (_currentUser == null) return "Giriş yapılmamış.";
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/users/profile'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'userId': int.tryParse(_currentUser!.uid) ?? 0,
+          'displayName': displayName.trim(),
+          'photoUrl': photoUrl.trim(),
+          'status': status.trim(),
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      _isLoading = false;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['user'] != null) {
+          _currentUser = _currentUser!.copyWith(
+            displayName: data['user']['displayName'],
+            photoUrl: data['user']['photoUrl'],
+            status: data['user']['status'],
+          );
+          if (_token != null) {
+            await _saveSession(_currentUser!, _token!);
+          }
+          notifyListeners();
+          return null; // Success
+        }
+      }
+      notifyListeners();
+      return "Profil güncellenemedi (${response.statusCode})";
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return "Sunucuya bağlanılamadı: $e";
+    }
+  }
+
+  // 4. LOGOUT API
   Future<void> signOut() async {
     await _clearSession();
     _currentUser = null;

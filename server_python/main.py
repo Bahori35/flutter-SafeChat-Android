@@ -207,6 +207,47 @@ def get_pending_call(userId: str):
     call_data = active_pending_calls.get(str(userId))
     return {"hasPendingCall": call_data is not None, "callData": call_data}
 
+class UpdateProfileRequest(BaseModel):
+    userId: int
+    displayName: Optional[str] = None
+    photoUrl: Optional[str] = None
+    status: Optional[str] = None
+
+@app.post("/api/users/profile")
+def update_profile(req: UpdateProfileRequest):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM users WHERE id = %s", (req.userId,))
+        user = cursor.fetchone()
+        if not user:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+
+        new_name = req.displayName.strip() if req.displayName is not None and req.displayName.strip() else user["display_name"]
+        new_photo = req.photoUrl.strip() if req.photoUrl is not None and req.photoUrl.strip() else user["photo_url"]
+        new_status = req.status.strip() if req.status is not None else user["status"]
+
+        cursor.execute(
+            "UPDATE users SET display_name = %s, photo_url = %s, status = %s WHERE id = %s",
+            (new_name, new_photo, new_status, req.userId)
+        )
+        cursor.execute("SELECT * FROM users WHERE id = %s", (req.userId,))
+        updated_user = cursor.fetchone()
+    conn.close()
+
+    return {
+        "status": "success",
+        "message": "Profil başarıyla güncellendi",
+        "user": {
+            "id": updated_user["id"],
+            "username": updated_user["username"],
+            "displayName": updated_user["display_name"],
+            "photoUrl": updated_user["photo_url"],
+            "status": updated_user["status"],
+            "isOnline": updated_user["is_online"] == 1
+        }
+    }
+
 @app.post("/api/users/fcm-token")
 def update_fcm_token(req: FcmTokenRequest):
     conn = get_db_connection()
