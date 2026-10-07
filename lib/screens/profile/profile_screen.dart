@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../constants/app_colors.dart';
 import '../../services/custom_auth_service.dart';
 
@@ -16,6 +17,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _statusController;
   late TextEditingController _photoController;
+  bool _isUploading = false;
+  final ImagePicker _picker = ImagePicker();
 
   // Preset avatar choices
   final List<String> _avatarPresets = [
@@ -44,6 +47,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _statusController.dispose();
     _photoController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAndUploadImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (pickedFile == null) return;
+
+      setState(() {
+        _isUploading = true;
+      });
+
+      final authService = Provider.of<CustomAuthService>(context, listen: false);
+      final uploadedUrl = await authService.uploadImage(pickedFile.path);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isUploading = false;
+      });
+
+      if (uploadedUrl != null) {
+        setState(() {
+          _photoController.text = uploadedUrl;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fotoğraf yüklendi! Kaydetmek için sağ üstteki tike veya KAYDET butonuna basın.'),
+            backgroundColor: AppColors.primaryLight,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.'),
+            backgroundColor: AppColors.callRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hata: $e'),
+            backgroundColor: AppColors.callRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _saveProfile() async {
@@ -86,42 +149,113 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Bir Profil Fotoğrafı Seçin',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: 16),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: _avatarPresets.length,
-                itemBuilder: (context, index) {
-                  final url = _avatarPresets[index];
-                  return InkWell(
-                    onTap: () {
-                      setState(() {
-                        _photoController.text = url;
-                      });
-                      Navigator.pop(ctx);
-                    },
-                    child: CircleAvatar(
-                      backgroundImage: CachedNetworkImageProvider(url),
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                  );
-                },
-              ),
-            ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Profil Fotoğrafı Seç',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _pickAndUploadImage(ImageSource.gallery);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.photo_library, color: AppColors.primaryLight, size: 32),
+                              SizedBox(height: 8),
+                              Text('Galeriden Seç', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _pickAndUploadImage(ImageSource.camera);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.camera_alt, color: AppColors.primaryLight, size: 32),
+                              SizedBox(height: 8),
+                              Text('Fotoğraf Çek', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Veya Hazır Avatarlardan Seçin',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: _avatarPresets.length,
+                  itemBuilder: (context, index) {
+                    final url = _avatarPresets[index];
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          _photoController.text = url;
+                        });
+                        Navigator.pop(ctx);
+                      },
+                      child: CircleAvatar(
+                        backgroundImage: CachedNetworkImageProvider(url),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
           ),
         );
       },
@@ -168,15 +302,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       backgroundImage: currentPhoto.isNotEmpty
                           ? CachedNetworkImageProvider(currentPhoto)
                           : null,
-                      child: currentPhoto.isEmpty
-                          ? const Icon(Icons.person, size: 56, color: AppColors.textSecondary)
-                          : null,
+                      child: _isUploading
+                          ? const CircularProgressIndicator(color: AppColors.primaryLight)
+                          : (currentPhoto.isEmpty
+                              ? const Icon(Icons.person, size: 56, color: AppColors.textSecondary)
+                              : null),
                     ),
                     Positioned(
                       bottom: 0,
                       right: 0,
                       child: GestureDetector(
-                        onTap: _showAvatarPicker,
+                        onTap: _isUploading ? null : _showAvatarPicker,
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: const BoxDecoration(

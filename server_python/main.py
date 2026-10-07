@@ -1,12 +1,14 @@
 import os
+import uuid
 import pymysql
 import socketio
 import uvicorn
 import bcrypt
 import firebase_admin
 from firebase_admin import credentials, messaging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 from jose import jwt
@@ -206,6 +208,29 @@ class MessageDeliveredRequest(BaseModel):
 def get_pending_call(userId: str):
     call_data = active_pending_calls.get(str(userId))
     return {"hasPendingCall": call_data is not None, "callData": call_data}
+
+# Create uploads directory if not exists
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    try:
+        ext = os.path.splitext(file.filename)[1]
+        if not ext:
+            ext = ".jpg"
+        unique_filename = f"{uuid.uuid4().hex}{ext}"
+        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+        
+        contents = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(contents)
+            
+        public_url = f"http://46.197.188.20:3000/uploads/{unique_filename}"
+        return {"status": "success", "url": public_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Dosya yuklenemedi: {e}")
 
 class UpdateProfileRequest(BaseModel):
     userId: int

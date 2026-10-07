@@ -250,6 +250,24 @@ class CustomAuthService extends ChangeNotifier {
     }
   }
 
+  // Upload image to server and get public URL
+  Future<String?> uploadImage(String filePath) async {
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/upload'));
+      request.files.add(await http.MultipartFile.fromPath('file', filePath));
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 15));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['url'];
+      }
+    } catch (e) {
+      debugPrint('[UPLOAD] Error uploading image: $e');
+    }
+    return null;
+  }
+
   // 4. LOGOUT API
   Future<void> signOut() async {
     await _clearSession();
