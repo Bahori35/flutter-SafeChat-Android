@@ -194,6 +194,12 @@ class FcmTokenRequest(BaseModel):
     userId: int
     fcmToken: str
 
+class SendMessageRequest(BaseModel):
+    senderId: int
+    receiverId: int
+    content: str
+    type: Optional[str] = "text"
+
 # --- REST API ---
 
 @app.post("/api/users/fcm-token")
@@ -203,6 +209,36 @@ def update_fcm_token(req: FcmTokenRequest):
         cursor.execute("UPDATE users SET fcm_token = %s WHERE id = %s", (req.fcmToken, req.userId))
     conn.close()
     return {"status": "success", "message": "FCM Token guncellendi"}
+
+@app.post("/api/messages/send")
+def send_message_rest(req: SendMessageRequest):
+    conn = get_db_connection()
+    sender_name = "Biri"
+    with conn.cursor() as cursor:
+        cursor.execute(
+            "INSERT INTO messages (sender_id, receiver_id, content, message_type) VALUES (%s, %s, %s, %s)",
+            (req.senderId, req.receiverId, req.content, req.type)
+        )
+        msg_id = cursor.lastrowid
+        cursor.execute("SELECT display_name, username FROM users WHERE id = %s", (req.senderId,))
+        sender_row = cursor.fetchone()
+        if sender_row:
+            sender_name = sender_row.get("display_name") or sender_row.get("username") or "Biri"
+    conn.close()
+
+    # Trigger Push Notification
+    send_fcm_push(
+        user_id=req.receiverId,
+        title=f"Yeni Mesaj: {sender_name}",
+        body=req.content if req.type == "text" else "Yeni bir medya mesajı aldınız.",
+        data_payload={
+            "type": "message",
+            "senderId": str(req.senderId),
+            "senderName": sender_name,
+            "content": req.content,
+        }
+    )
+    return {"status": "success", "messageId": msg_id}
 
 
 @app.post("/api/auth/register")
@@ -325,6 +361,7 @@ async def join(sid, user_id):
 
 @sio.event
 async def send_message(sid, data):
+    print(f"[SOCKET] send_message tetiklendi: {data}")
     sender_id = data.get("senderId")
     receiver_id = data.get("receiverId")
     content = data.get("content")
@@ -360,22 +397,28 @@ async def send_message(sid, data):
         await sio.emit("receive_message", saved_message, to=receiver_sid)
     await sio.emit("message_sent", saved_message, to=sid)
 
-    # Trigger FCM Push Notification if peer is in background / closed
-    send_fcm_push(
-        user_id=int(receiver_id),
-        title=f"Yeni Mesaj: {sender_name}",
-        body=content if msg_type == "text" else "Yeni bir medya mesajı aldınız.",
-        data_payload={
-            "type": "message",
-            "senderId": sender_id,
-            "senderName": sender_name,
-            "content": content,
-        }
-    )
+    # Trigger FCM Push Notification
+    try:
+        target_uid = int(receiver_id)
+        print(f"[FCM] send_message push cagriliyor -> Target UID: {target_uid}")
+        send_fcm_push(
+            user_id=target_uid,
+            title=f"Yeni Mesaj: {sender_name}",
+            body=content if msg_type == "text" else "Yeni bir medya mesajı aldınız.",
+            data_payload={
+                "type": "message",
+                "senderId": sender_id,
+                "senderName": sender_name,
+                "content": content,
+            }
+        )
+    except Exception as e:
+        print(f"[FCM HATA] send_message icinde push hatasi: {e}")
 
 
 @sio.event
 async def call_user(sid, data):
+    print(f"[SOCKET] call_user tetiklendi: {data.get('callType')} -> Receiver: {data.get('receiverId')}")
     receiver_id = data.get("receiverId")
     caller_data = data.get("caller", {})
     caller_name = caller_data.get("displayName") or caller_data.get("username") or "Biri"
@@ -386,17 +429,22 @@ async def call_user(sid, data):
         await sio.emit("incoming_call", data, to=receiver_sid)
 
     # Always trigger high-priority FCM wake-up call notification
-    send_fcm_push(
-        user_id=int(receiver_id),
-        title=f"Gelen { 'Görüntülü' if call_type_str == 'video' else 'Sesli' } Arama",
-        body=f"{caller_name} sizi arıyor...",
-        data_payload={
-            "type": "call",
-            "callerName": caller_name,
-            "callType": call_type_str,
-            "callerId": caller_data.get("uid", ""),
-        }
-    )
+    try:
+        target_uid = int(receiver_id)
+        print(f"[FCM] call_user push cagriliyor -> Target UID: {target_uid}")
+        send_fcm_push(
+            user_id=target_uid,
+            title=f"Gelen { 'Görüntülü' if call_type_str == 'video' else 'Sesli' } Arama",
+            body=f"{caller_name} sizi arıyor...",
+            data_payload={
+                "type": "call",
+                "callerName": caller_name,
+                "callType": call_type_str,
+                "callerId": caller_data.get("uid", ""),
+            }
+        )
+    except Exception as e:
+        print(f"[FCM HATA] call_user icinde push hatasi: {e}")
 
 
 @sio.event

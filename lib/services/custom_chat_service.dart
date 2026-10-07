@@ -62,4 +62,22 @@ class CustomChatService {
     }
     return [];
   }
+  // Send message via REST fallback as well to guarantee FCM delivery even if socket is reconnecting
+  Future<void> sendChatMessageRest({
+    required String senderId,
+    required String receiverId,
+    required String content,
+  }) async {
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/messages/send'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'senderId': int.tryParse(senderId) ?? 0,
+          'receiverId': int.tryParse(receiverId) ?? 0,
+          'content': content,
+        }),
+      ).timeout(const Duration(seconds: 5));
+    } catch (_) {}
+  }
 }
