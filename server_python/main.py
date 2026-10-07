@@ -55,24 +55,15 @@ def send_fcm_push(user_id: int, title: str, body: str, data_payload: dict = None
         fcm_token = row["fcm_token"]
         msg_data = {k: str(v) for k, v in (data_payload or {}).items()}
         
-        # High priority Android notification payload
+        # High priority Android DATA-ONLY payload (prevent duplicate notification from Android OS)
+        msg_data["title"] = str(title)
+        msg_data["body"] = str(body)
+        
         message = messaging.Message(
-            notification=messaging.Notification(
-                title=title,
-                body=body,
-            ),
             data=msg_data,
             android=messaging.AndroidConfig(
                 priority="high",
                 ttl=timedelta(seconds=60) if msg_data.get("type") == "call" else timedelta(hours=24),
-                notification=messaging.AndroidNotification(
-                    sound="default",
-                    channel_id="whatsapp_system_call_ringtone_channel" if msg_data.get("type") == "call" else "whatsapp_messages",
-                    click_action="FLUTTER_NOTIFICATION_CLICK",
-                    priority="max" if msg_data.get("type") == "call" else "high",
-                    default_vibrate_timings=True,
-                    default_sound=True,
-                )
             ),
             token=fcm_token,
         )
