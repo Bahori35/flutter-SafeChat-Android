@@ -195,6 +195,11 @@ class FcmTokenRequest(BaseModel):
     userId: int
     fcmToken: str
 
+class MessageDeliveredRequest(BaseModel):
+    receiverId: int
+    senderId: Optional[int] = None
+    messageId: Optional[int] = None
+
 @app.post("/api/users/fcm-token")
 def update_fcm_token(req: FcmTokenRequest):
     conn = get_db_connection()
@@ -202,6 +207,25 @@ def update_fcm_token(req: FcmTokenRequest):
         cursor.execute("UPDATE users SET fcm_token = %s WHERE id = %s", (req.fcmToken, req.userId))
     conn.close()
     return {"status": "success", "message": "FCM Token guncellendi"}
+
+@app.post("/api/messages/delivered")
+async def report_delivered_rest(req: MessageDeliveredRequest):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        if req.messageId:
+            cursor.execute("UPDATE messages SET is_delivered = 1 WHERE id = %s", (req.messageId,))
+        elif req.senderId and req.receiverId:
+            cursor.execute("UPDATE messages SET is_delivered = 1 WHERE sender_id = %s AND receiver_id = %s", (req.senderId, req.receiverId))
+        else:
+            cursor.execute("UPDATE messages SET is_delivered = 1 WHERE receiver_id = %s", (req.receiverId,))
+    conn.close()
+
+    if req.senderId:
+        sender_sid = active_sockets.get(str(req.senderId))
+        if sender_sid:
+            await sio.emit("messages_delivered", {"senderId": str(req.senderId), "receiverId": str(req.receiverId), "messageId": req.messageId}, to=sender_sid)
+
+    return {"status": "success"}
 
 
 @app.post("/api/auth/register")
@@ -375,7 +399,9 @@ async def send_message(sid, data):
             body=content if msg_type == "text" else "Yeni bir medya mesajı aldınız.",
             data_payload={
                 "type": "message",
-                "senderId": sender_id,
+                "messageId": str(msg_id),
+                "senderId": str(sender_id),
+                "receiverId": str(receiver_id),
                 "senderName": sender_name,
                 "content": content,
             }

@@ -10,6 +10,9 @@ import 'screens/home/home_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/notification_service.dart';
 
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
@@ -36,6 +39,25 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         senderName: senderName,
         messageContent: content,
       );
+
+      // Report delivery back to server so sender immediately sees gray double tick (done_all)
+      try {
+        final senderId = int.tryParse(data['senderId'] ?? '0');
+        final receiverId = int.tryParse(data['receiverId'] ?? '0');
+        final messageId = int.tryParse(data['messageId'] ?? '0');
+
+        if (receiverId != null && receiverId > 0) {
+          http.post(
+            Uri.parse('http://46.197.188.20:3000/api/messages/delivered'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'receiverId': receiverId,
+              'senderId': senderId,
+              'messageId': messageId,
+            }),
+          ).timeout(const Duration(seconds: 3));
+        }
+      } catch (_) {}
     }
   } catch (e) {
     debugPrint('[FCM BG HANDLER] Hata: $e');
