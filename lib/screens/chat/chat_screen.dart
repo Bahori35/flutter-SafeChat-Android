@@ -90,21 +90,14 @@ class _ChatScreenState extends State<ChatScreen> {
       isRead: false,
     );
 
-    // 1. Emit live via Socket.io to peer & save in MariaDB
+    // 1. Emit live via Socket.io to peer & save in MariaDB & trigger single push
     _socketService.sendMessage(
       senderId: widget.currentUser.uid,
       receiverId: widget.peerUser.uid,
       content: text,
     );
 
-    // 2. Also send REST backup to guarantee FCM push delivery even if socket reconnects
-    _chatService.sendChatMessageRest(
-      senderId: widget.currentUser.uid,
-      receiverId: widget.peerUser.uid,
-      content: text,
-    );
-
-    // 3. Add to local list
+    // 2. Add to local list
     setState(() {
       _messages.insert(0, newMessage);
     });

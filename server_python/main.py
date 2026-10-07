@@ -198,14 +198,6 @@ class FcmTokenRequest(BaseModel):
     userId: int
     fcmToken: str
 
-class SendMessageRequest(BaseModel):
-    senderId: int
-    receiverId: int
-    content: str
-    type: Optional[str] = "text"
-
-# --- REST API ---
-
 @app.post("/api/users/fcm-token")
 def update_fcm_token(req: FcmTokenRequest):
     conn = get_db_connection()
@@ -213,36 +205,6 @@ def update_fcm_token(req: FcmTokenRequest):
         cursor.execute("UPDATE users SET fcm_token = %s WHERE id = %s", (req.fcmToken, req.userId))
     conn.close()
     return {"status": "success", "message": "FCM Token guncellendi"}
-
-@app.post("/api/messages/send")
-def send_message_rest(req: SendMessageRequest):
-    conn = get_db_connection()
-    sender_name = "Biri"
-    with conn.cursor() as cursor:
-        cursor.execute(
-            "INSERT INTO messages (sender_id, receiver_id, content, message_type) VALUES (%s, %s, %s, %s)",
-            (req.senderId, req.receiverId, req.content, req.type)
-        )
-        msg_id = cursor.lastrowid
-        cursor.execute("SELECT display_name, username FROM users WHERE id = %s", (req.senderId,))
-        sender_row = cursor.fetchone()
-        if sender_row:
-            sender_name = sender_row.get("display_name") or sender_row.get("username") or "Biri"
-    conn.close()
-
-    # Trigger Push Notification
-    send_fcm_push(
-        user_id=req.receiverId,
-        title=f"Yeni Mesaj: {sender_name}",
-        body=req.content if req.type == "text" else "Yeni bir medya mesajı aldınız.",
-        data_payload={
-            "type": "message",
-            "senderId": str(req.senderId),
-            "senderName": sender_name,
-            "content": req.content,
-        }
-    )
-    return {"status": "success", "messageId": msg_id}
 
 
 @app.post("/api/auth/register")
