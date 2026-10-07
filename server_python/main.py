@@ -44,29 +44,38 @@ def send_fcm_push(user_id: int, title: str, body: str, data_payload: dict = None
             row = cursor.fetchone()
         conn.close()
 
-        if row and row.get("fcm_token"):
-            fcm_token = row["fcm_token"]
-            msg_data = {k: str(v) for k, v in (data_payload or {}).items()}
-            message = messaging.Message(
-                notification=messaging.Notification(
-                    title=title,
-                    body=body,
-                ),
-                data=msg_data,
-                android=messaging.AndroidConfig(
-                    priority="high",
-                    notification=messaging.AndroidNotification(
-                        sound="default",
-                        channel_id="whatsapp_system_call_ringtone_channel" if msg_data.get("type") == "call" else "whatsapp_messages",
-                        click_action="FLUTTER_NOTIFICATION_CLICK"
-                    )
-                ),
-                token=fcm_token,
-            )
-            response = messaging.send(message)
-            print(f"[FCM] Push bildirimi gonderildi (ID: {user_id}): {response}")
+        if not row or not row.get("fcm_token"):
+            print(f"[FCM UYARI] Kullanici #{user_id} icin veritabaninda fcm_token bulunamadi (NULL)! Bildirim atilamadi.")
+            return
+
+        fcm_token = row["fcm_token"]
+        msg_data = {k: str(v) for k, v in (data_payload or {}).items()}
+        
+        # High priority Android notification payload
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
+            data=msg_data,
+            android=messaging.AndroidConfig(
+                priority="high",
+                ttl=timedelta(seconds=60) if msg_data.get("type") == "call" else timedelta(hours=24),
+                notification=messaging.AndroidNotification(
+                    sound="default",
+                    channel_id="whatsapp_system_call_ringtone_channel" if msg_data.get("type") == "call" else "whatsapp_messages",
+                    click_action="FLUTTER_NOTIFICATION_CLICK",
+                    priority="max" if msg_data.get("type") == "call" else "high",
+                    default_vibrate_timings=True,
+                    default_sound=True,
+                )
+            ),
+            token=fcm_token,
+        )
+        response = messaging.send(message)
+        print(f"[FCM] Push bildirimi basariyla gonderildi (Kullanici ID: {user_id}): {response}")
     except Exception as e:
-        print(f"[FCM HATA] Bildirim gonderilemedi: {e}")
+        print(f"[FCM HATA] Bildirim gonderilemedi (Kullanici ID: {user_id}): {e}")
 
 
 def hash_password(password: str) -> str:

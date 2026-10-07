@@ -94,18 +94,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         alert: true,
         badge: true,
         sound: true,
+        provisional: false,
       );
 
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        String? token = await messaging.getToken();
-        if (token != null) {
-          authService.syncFcmToken(token);
-        }
+      debugPrint('[FCM] Bildirim izin durumu: ${settings.authorizationStatus}');
 
-        messaging.onTokenRefresh.listen((newToken) {
-          authService.syncFcmToken(newToken);
-        });
+      String? token = await messaging.getToken();
+      if (token != null) {
+        debugPrint('[FCM] Cihaz Token alindi: $token');
+        await authService.syncFcmToken(token);
       }
+
+      messaging.onTokenRefresh.listen((newToken) {
+        debugPrint('[FCM] Token yenilendi: $newToken');
+        authService.syncFcmToken(newToken);
+      });
     } catch (e) {
       debugPrint('[FCM] Error initializing messaging: $e');
     }

@@ -45,9 +45,12 @@ class CustomAuthService extends ChangeNotifier {
 
   // Sync FCM Token to Python MariaDB Backend
   Future<void> syncFcmToken(String fcmToken) async {
-    if (_currentUser == null) return;
+    if (_currentUser == null) {
+      debugPrint('[FCM] syncFcmToken cagrildi ama _currentUser NULL!');
+      return;
+    }
     try {
-      await http.post(
+      final response = await http.post(
         Uri.parse('$baseUrl/users/fcm-token'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -55,7 +58,7 @@ class CustomAuthService extends ChangeNotifier {
           'fcmToken': fcmToken,
         }),
       ).timeout(const Duration(seconds: 5));
-      debugPrint('[FCM] Token sunucuya gonderildi!');
+      debugPrint('[FCM] Token sunucuya gonderildi (User: ${_currentUser!.uid})! Status: ${response.statusCode}');
     } catch (e) {
       debugPrint('[FCM] Token gonderilemedi: $e');
     }
