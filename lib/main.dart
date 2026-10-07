@@ -48,31 +48,6 @@ void main() async {
   try {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-    // Foreground message listener
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      final data = message.data;
-      final msgType = data['type'] ?? 'message';
-      final notificationService = NotificationService();
-
-      if (msgType == 'call') {
-        final callerName = data['callerName'] ?? 'Biri';
-        final callType = data['callType'] == 'video' ? 'Görüntülü' : 'Sesli';
-        notificationService.showIncomingCallNotification(
-          id: 9999,
-          callerName: callerName,
-          callType: callType,
-        );
-      } else {
-        final senderName = data['senderName'] ?? message.notification?.title ?? 'Yeni Mesaj';
-        final content = data['content'] ?? message.notification?.body ?? 'Mesaj içeriği';
-        notificationService.showMessageNotification(
-          id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          senderName: senderName,
-          messageContent: content,
-        );
-      }
-    });
   } catch (e) {
     debugPrint('[FIREBASE] Init error: $e');
   }
