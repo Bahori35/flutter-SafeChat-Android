@@ -24,13 +24,17 @@ SECRET_KEY = os.getenv("JWT_SECRET", "super_secret_jwt_key_whatsapp_clone_2026")
 firebase_initialized = False
 try:
     key_path = os.path.join(os.path.dirname(__file__), "safechet-bildirim-firebase-adminsdk-fbsvc-9989ea95a3.json")
-    if os.path.exists(key_path):
-        cred = credentials.Certificate(key_path)
-        firebase_admin.initialize_app(cred)
-        firebase_initialized = True
-        print("[OK] Firebase Admin SDK basariyla yuklendi!")
+    if not firebase_admin._apps:
+        if os.path.exists(key_path):
+            cred = credentials.Certificate(key_path)
+            firebase_admin.initialize_app(cred)
+            firebase_initialized = True
+            print("[OK] Firebase Admin SDK basariyla yuklendi!")
+        else:
+            print(f"[UYARI] Firebase key dosyasi bulunamadi: {key_path}")
     else:
-        print(f"[UYARI] Firebase key dosyasi bulunamadi: {key_path}")
+        firebase_initialized = True
+        print("[OK] Firebase Admin SDK zaten calisiyor!")
 except Exception as e:
     print(f"[HATA] Firebase Admin baslatilamadi: {e}")
 
