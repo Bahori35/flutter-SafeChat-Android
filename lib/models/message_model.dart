@@ -10,6 +10,7 @@ class MessageModel {
   final String content;
   final MessageType type;
   final DateTime timestamp;
+  final bool isDelivered;
   final bool isRead;
   final String? mediaUrl;
 
@@ -21,6 +22,7 @@ class MessageModel {
     required this.content,
     this.type = MessageType.text,
     required this.timestamp,
+    this.isDelivered = false,
     this.isRead = false,
     this.mediaUrl,
   });
@@ -34,6 +36,7 @@ class MessageModel {
       'content': content,
       'type': type.name,
       'timestamp': timestamp.toIso8601String(),
+      'isDelivered': isDelivered,
       'isRead': isRead,
       'mediaUrl': mediaUrl,
     };
@@ -60,8 +63,35 @@ class MessageModel {
         orElse: () => MessageType.text,
       ),
       timestamp: parsedTime,
-      isRead: map['isRead'] ?? false,
+      isDelivered: map['isDelivered'] == 1 || map['isDelivered'] == true || map['isRead'] == 1 || map['isRead'] == true,
+      isRead: map['isRead'] == 1 || map['isRead'] == true,
       mediaUrl: map['mediaUrl'],
+    );
+  }
+
+  MessageModel copyWith({
+    String? id,
+    String? senderId,
+    String? senderName,
+    String? receiverId,
+    String? content,
+    MessageType? type,
+    DateTime? timestamp,
+    bool? isDelivered,
+    bool? isRead,
+    String? mediaUrl,
+  }) {
+    return MessageModel(
+      id: id ?? this.id,
+      senderId: senderId ?? this.senderId,
+      senderName: senderName ?? this.senderName,
+      receiverId: receiverId ?? this.receiverId,
+      content: content ?? this.content,
+      type: type ?? this.type,
+      timestamp: timestamp ?? this.timestamp,
+      isDelivered: isDelivered ?? this.isDelivered,
+      isRead: isRead ?? this.isRead,
+      mediaUrl: mediaUrl ?? this.mediaUrl,
     );
   }
 }

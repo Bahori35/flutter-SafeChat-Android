@@ -132,6 +132,7 @@ def init_db():
                 receiver_id INT NOT NULL,
                 content TEXT NOT NULL,
                 message_type ENUM('text', 'image', 'audio', 'call') DEFAULT 'text',
+                is_delivered BOOLEAN DEFAULT FALSE,
                 is_read BOOLEAN DEFAULT FALSE,
                 media_url VARCHAR(255) NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -139,6 +140,11 @@ def init_db():
                 FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
             );
             """)
+
+            try:
+                cursor.execute("ALTER TABLE messages ADD COLUMN is_delivered BOOLEAN DEFAULT FALSE;")
+            except Exception:
+                pass
 
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS call_logs (
@@ -283,7 +289,7 @@ def get_messages(user1: int, user2: int):
     conn = get_db_connection()
     with conn.cursor() as cursor:
         cursor.execute(
-            """SELECT id, sender_id AS senderId, receiver_id AS receiverId, content, message_type AS type, is_read AS isRead, media_url AS mediaUrl, created_at AS timestamp 
+            """SELECT id, sender_id AS senderId, receiver_id AS receiverId, content, message_type AS type, is_delivered AS isDelivered, is_read AS isRead, media_url AS mediaUrl, created_at AS timestamp 
                FROM messages 
                WHERE (sender_id = %s AND receiver_id = %s) OR (sender_id = %s AND receiver_id = %s) 
                ORDER BY created_at ASC""",
@@ -309,6 +315,8 @@ async def join(sid, user_id):
         conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute("UPDATE users SET is_online = 1 WHERE id = %s", (user_id,))
+            # Mark all pending messages to this user as delivered
+            cursor.execute("UPDATE messages SET is_delivered = 1 WHERE receiver_id = %s AND is_delivered = 0", (user_id,))
         conn.close()
     except Exception as e:
         print(f"[DB ERR] {e}")
@@ -324,12 +332,15 @@ async def send_message(sid, data):
     content = data.get("content")
     msg_type = data.get("type", "text")
 
+    receiver_sid = active_sockets.get(str(receiver_id))
+    is_delivered = bool(receiver_sid)
+
     conn = get_db_connection()
     sender_name = "Biri"
     with conn.cursor() as cursor:
         cursor.execute(
-            "INSERT INTO messages (sender_id, receiver_id, content, message_type) VALUES (%s, %s, %s, %s)",
-            (sender_id, receiver_id, content, msg_type)
+            "INSERT INTO messages (sender_id, receiver_id, content, message_type, is_delivered, is_read) VALUES (%s, %s, %s, %s, %s, 0)",
+            (sender_id, receiver_id, content, msg_type, is_delivered)
         )
         msg_id = cursor.lastrowid
         cursor.execute("SELECT display_name, username FROM users WHERE id = %s", (sender_id,))
@@ -345,11 +356,11 @@ async def send_message(sid, data):
         "receiverId": receiver_id,
         "content": content,
         "type": msg_type,
+        "isDelivered": is_delivered,
         "isRead": False,
         "timestamp": str(datetime.now())
     }
 
-    receiver_sid = active_sockets.get(str(receiver_id))
     if receiver_sid:
         await sio.emit("receive_message", saved_message, to=receiver_sid)
     await sio.emit("message_sent", saved_message, to=sid)
@@ -371,6 +382,46 @@ async def send_message(sid, data):
         )
     except Exception as e:
         print(f"[FCM HATA] send_message icinde push hatasi: {e}")
+
+
+@sio.event
+async def message_delivered(sid, data):
+    # Receiver reports that messages were delivered
+    sender_id = data.get("senderId")
+    receiver_id = data.get("receiverId")
+    msg_id = data.get("messageId")
+
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        if msg_id:
+            cursor.execute("UPDATE messages SET is_delivered = 1 WHERE id = %s", (msg_id,))
+        elif sender_id and receiver_id:
+            cursor.execute("UPDATE messages SET is_delivered = 1 WHERE sender_id = %s AND receiver_id = %s", (sender_id, receiver_id))
+    conn.close()
+
+    sender_sid = active_sockets.get(str(sender_id))
+    if sender_sid:
+        await sio.emit("messages_delivered", {"senderId": str(sender_id), "receiverId": str(receiver_id), "messageId": msg_id}, to=sender_sid)
+
+
+@sio.event
+async def message_read(sid, data):
+    # Receiver opened the chat / read the message
+    sender_id = data.get("senderId")
+    receiver_id = data.get("receiverId")
+    msg_id = data.get("messageId")
+
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        if msg_id:
+            cursor.execute("UPDATE messages SET is_delivered = 1, is_read = 1 WHERE id = %s", (msg_id,))
+        elif sender_id and receiver_id:
+            cursor.execute("UPDATE messages SET is_delivered = 1, is_read = 1 WHERE sender_id = %s AND receiver_id = %s", (sender_id, receiver_id))
+    conn.close()
+
+    sender_sid = active_sockets.get(str(sender_id))
+    if sender_sid:
+        await sio.emit("messages_read", {"senderId": str(sender_id), "receiverId": str(receiver_id), "messageId": msg_id}, to=sender_sid)
 
 
 @sio.event

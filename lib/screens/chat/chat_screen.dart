@@ -38,14 +38,64 @@ class _ChatScreenState extends State<ChatScreen> {
     _peer = widget.peerUser;
     _loadMessages();
 
+    // Mark all existing messages as read when opening chat
+    _socketService.emitMessageRead(
+      senderId: widget.peerUser.uid,
+      receiverId: widget.currentUser.uid,
+    );
+
     // Listen for live messages received from socket
     _socketService.onMessageReceived = (message) {
       if (message.senderId == widget.peerUser.uid) {
         if (mounted) {
           setState(() {
-            _messages.insert(0, message);
+            _messages.insert(0, message.copyWith(isRead: true, isDelivered: true));
           });
+          // Immediately send read receipt back since chat is actively open
+          _socketService.emitMessageRead(
+            senderId: widget.peerUser.uid,
+            receiverId: widget.currentUser.uid,
+            messageId: message.id,
+          );
         }
+      }
+    };
+
+    // Listen for message delivered receipt (Gray Double Tick)
+    _socketService.onMessageDelivered = (data) {
+      if (mounted) {
+        final messageId = data['messageId']?.toString();
+        setState(() {
+          _messages = _messages.map((m) {
+            if (messageId != null) {
+              if (m.id == messageId) {
+                return m.copyWith(isDelivered: true);
+              }
+            } else if (m.senderId == widget.currentUser.uid) {
+              return m.copyWith(isDelivered: true);
+            }
+            return m;
+          }).toList();
+        });
+      }
+    };
+
+    // Listen for message read receipt (Blue Double Tick)
+    _socketService.onMessageRead = (data) {
+      if (mounted) {
+        final messageId = data['messageId']?.toString();
+        setState(() {
+          _messages = _messages.map((m) {
+            if (messageId != null) {
+              if (m.id == messageId) {
+                return m.copyWith(isDelivered: true, isRead: true);
+              }
+            } else if (m.senderId == widget.currentUser.uid) {
+              return m.copyWith(isDelivered: true, isRead: true);
+            }
+            return m;
+          }).toList();
+        });
       }
     };
 
@@ -59,7 +109,6 @@ class _ChatScreenState extends State<ChatScreen> {
     };
   }
 
-
   void _loadMessages() async {
     final messages = await _chatService.getMessages(widget.currentUser.uid, widget.peerUser.uid);
     if (mounted) {
@@ -67,6 +116,11 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages = messages.reversed.toList();
         _isLoading = false;
       });
+      // Mark as read
+      _socketService.emitMessageRead(
+        senderId: widget.peerUser.uid,
+        receiverId: widget.currentUser.uid,
+      );
     }
   }
 
@@ -248,8 +302,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (isMe) ...[
                   const SizedBox(width: 4),
                   Icon(
-                    message.isRead ? Icons.done_all : Icons.done,
-                    size: 14,
+                    (message.isRead || message.isDelivered) ? Icons.done_all : Icons.done,
+                    size: 15,
                     color: message.isRead ? AppColors.accent : AppColors.textSecondary,
                   ),
                 ],

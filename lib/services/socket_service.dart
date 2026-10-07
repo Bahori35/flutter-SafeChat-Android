@@ -6,6 +6,8 @@ import '../models/call_model.dart';
 import '../models/user_model.dart';
 
 typedef OnMessageReceived = void Function(MessageModel message);
+typedef OnMessageDelivered = void Function(Map<String, dynamic> data);
+typedef OnMessageRead = void Function(Map<String, dynamic> data);
 typedef OnIncomingCall = void Function(Map<String, dynamic> callData);
 typedef OnCallAnswered = void Function(Map<String, dynamic> answerData);
 typedef OnIceCandidate = void Function(Map<String, dynamic> candidateData);
@@ -21,6 +23,8 @@ class SocketService {
   String? _currentUserId;
 
   OnMessageReceived? onMessageReceived;
+  OnMessageDelivered? onMessageDelivered;
+  OnMessageRead? onMessageRead;
   OnIncomingCall? onIncomingCall;
   OnCallAnswered? onCallAnswered;
   OnIceCandidate? onIceCandidate;
@@ -52,7 +56,7 @@ class SocketService {
 
     socket!.on('receive_message', (data) {
       debugPrint('[SOCKET] Received Message: $data');
-      if (onMessageReceived != null && data != null) {
+      if (data != null) {
         final message = MessageModel(
           id: data['id'].toString(),
           senderId: data['senderId'].toString(),
@@ -60,10 +64,35 @@ class SocketService {
           content: data['content'] ?? '',
           type: MessageType.text,
           timestamp: DateTime.tryParse(data['timestamp'] ?? '') ?? DateTime.now(),
+          isDelivered: true,
           isRead: data['isRead'] == 1 || data['isRead'] == true,
           mediaUrl: data['mediaUrl'],
         );
-        onMessageReceived!(message);
+
+        // Notify sender that message was delivered
+        emitMessageDelivered(
+          senderId: message.senderId,
+          receiverId: message.receiverId,
+          messageId: message.id,
+        );
+
+        if (onMessageReceived != null) {
+          onMessageReceived!(message);
+        }
+      }
+    });
+
+    socket!.on('messages_delivered', (data) {
+      debugPrint('[SOCKET] Messages Delivered: $data');
+      if (onMessageDelivered != null && data != null) {
+        onMessageDelivered!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('messages_read', (data) {
+      debugPrint('[SOCKET] Messages Read: $data');
+      if (onMessageRead != null && data != null) {
+        onMessageRead!(Map<String, dynamic>.from(data));
       }
     });
 
@@ -105,6 +134,24 @@ class SocketService {
     });
 
     socket!.onDisconnect((_) => debugPrint('[SOCKET] Disconnected'));
+  }
+
+  // Report message delivered
+  void emitMessageDelivered({required String senderId, required String receiverId, String? messageId}) {
+    socket?.emit('message_delivered', {
+      'senderId': senderId,
+      'receiverId': receiverId,
+      'messageId': messageId,
+    });
+  }
+
+  // Report message read
+  void emitMessageRead({required String senderId, required String receiverId, String? messageId}) {
+    socket?.emit('message_read', {
+      'senderId': senderId,
+      'receiverId': receiverId,
+      'messageId': messageId,
+    });
   }
 
 
