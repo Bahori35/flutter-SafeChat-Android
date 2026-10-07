@@ -181,6 +181,8 @@ app.add_middleware(
 
 # Active sockets: user_id -> sid
 active_sockets = {}
+# Active pending calls: receiver_id (str) -> callData (dict)
+active_pending_calls = {}
 
 class RegisterRequest(BaseModel):
     username: str
@@ -199,6 +201,11 @@ class MessageDeliveredRequest(BaseModel):
     receiverId: int
     senderId: Optional[int] = None
     messageId: Optional[int] = None
+
+@app.get("/api/calls/pending/{userId}")
+def get_pending_call(userId: str):
+    call_data = active_pending_calls.get(str(userId))
+    return {"hasPendingCall": call_data is not None, "callData": call_data}
 
 @app.post("/api/users/fcm-token")
 def update_fcm_token(req: FcmTokenRequest):
@@ -458,6 +465,9 @@ async def call_user(sid, data):
     caller_name = caller_data.get("displayName") or caller_data.get("username") or "Biri"
     call_type_str = data.get("callType", "video")
 
+    # Store pending call in memory so killed/background app can retrieve it on launch
+    active_pending_calls[str(receiver_id)] = data
+
     receiver_sid = active_sockets.get(str(receiver_id))
     if receiver_sid:
         await sio.emit("incoming_call", data, to=receiver_sid)
@@ -484,6 +494,11 @@ async def call_user(sid, data):
 @sio.event
 async def answer_call(sid, data):
     caller_id = data.get("callerId")
+    # Remove from pending
+    for r_id, c_data in list(active_pending_calls.items()):
+        if str(c_data.get("caller", {}).get("uid")) == str(caller_id):
+            active_pending_calls.pop(r_id, None)
+
     caller_sid = active_sockets.get(str(caller_id))
     if caller_sid:
         await sio.emit("call_answered", data, to=caller_sid)
@@ -498,6 +513,11 @@ async def ice_candidate(sid, data):
 @sio.event
 async def end_call(sid, data):
     target_user_id = data.get("targetUserId") if isinstance(data, dict) else None
+    
+    # Remove from pending calls
+    for r_id in list(active_pending_calls.keys()):
+        active_pending_calls.pop(r_id, None)
+
     if target_user_id:
         target_sid = active_sockets.get(str(target_user_id))
         if target_sid:

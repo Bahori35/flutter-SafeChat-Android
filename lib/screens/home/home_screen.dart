@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -81,8 +83,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         };
 
         _loadUsers();
+
+        // Check if there is an incoming call waiting for us (e.g. app was launched from notification)
+        _checkPendingIncomingCall(currentUser);
       }
     });
+  }
+
+  void _checkPendingIncomingCall(UserModel currentUser) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${CustomAuthService.baseUrl.replaceAll('/api', '')}/api/calls/pending/${currentUser.uid}'),
+      ).timeout(const Duration(seconds: 3));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['hasPendingCall'] == true && data['callData'] != null) {
+          debugPrint('[CALL] Bekleyen gelen arama bulundu, dialog aciliyor!');
+          _notificationService.startRingtone();
+          _showIncomingCallDialog(Map<String, dynamic>.from(data['callData']), currentUser);
+        }
+      }
+    } catch (e) {
+      debugPrint('[CALL] Pending call check error: $e');
+    }
   }
 
   void _initFirebaseMessaging(CustomAuthService authService) async {
