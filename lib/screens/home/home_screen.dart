@@ -1338,6 +1338,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   callDirectionColor = AppColors.callGreen;
                 }
 
+                String _formatCallTime(DateTime dt) {
+                  final now = DateTime.now();
+                  final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+                  final yesterday = now.subtract(const Duration(days: 1));
+                  final isYesterday = dt.year == yesterday.year && dt.month == yesterday.month && dt.day == yesterday.day;
+                  
+                  final timeStr = DateFormat('HH:mm').format(dt);
+                  if (isToday) {
+                    return 'Bugün, $timeStr';
+                  } else if (isYesterday) {
+                    return 'Dün, $timeStr';
+                  }
+                  
+                  const turkishMonths = [
+                    '', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+                    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+                  ];
+                  final monthName = (dt.month >= 1 && dt.month <= 12) ? turkishMonths[dt.month] : '';
+                  return '${dt.day} $monthName, $timeStr';
+                }
+
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   leading: CircleAvatar(
@@ -1359,7 +1380,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       Icon(callDirectionIcon, color: callDirectionColor, size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        DateFormat('dd MMM, HH:mm').format(log.timestamp),
+                        _formatCallTime(log.timestamp),
                         style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                       ),
                       if (log.durationSeconds > 0) ...[
