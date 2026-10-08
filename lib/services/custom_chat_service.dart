@@ -47,12 +47,18 @@ class CustomChatService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) {
+          final typeStr = json['type'] ?? json['message_type'] ?? 'text';
+          final msgType = MessageType.values.firstWhere(
+            (e) => e.name == typeStr,
+            orElse: () => MessageType.text,
+          );
+
           return MessageModel(
             id: json['id'].toString(),
             senderId: json['senderId'].toString(),
             receiverId: json['receiverId'].toString(),
             content: json['content'] ?? '',
-            type: MessageType.text,
+            type: msgType,
             timestamp: DateTime.tryParse(json['timestamp'] ?? '') ?? DateTime.now(),
             isDelivered: json['isDelivered'] == 1 || json['isDelivered'] == true || json['isRead'] == 1 || json['isRead'] == true,
             isRead: json['isRead'] == 1 || json['isRead'] == true,

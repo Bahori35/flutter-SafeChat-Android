@@ -627,8 +627,9 @@ async def send_message(sid, data):
     print(f"[SOCKET] send_message tetiklendi: {data}")
     sender_id = data.get("senderId")
     receiver_id = data.get("receiverId")
-    content = data.get("content")
+    content = data.get("content") or ""
     msg_type = data.get("type", "text")
+    media_url = data.get("mediaUrl")
 
     receiver_sid = active_sockets.get(str(receiver_id))
     is_delivered = bool(receiver_sid)
@@ -637,8 +638,8 @@ async def send_message(sid, data):
     sender_name = "Biri"
     with conn.cursor() as cursor:
         cursor.execute(
-            "INSERT INTO messages (sender_id, receiver_id, content, message_type, is_delivered, is_read) VALUES (%s, %s, %s, %s, %s, 0)",
-            (sender_id, receiver_id, content, msg_type, is_delivered)
+            "INSERT INTO messages (sender_id, receiver_id, content, message_type, media_url, is_delivered, is_read) VALUES (%s, %s, %s, %s, %s, %s, 0)",
+            (sender_id, receiver_id, content, msg_type, media_url, is_delivered)
         )
         msg_id = cursor.lastrowid
         cursor.execute("SELECT display_name, username FROM users WHERE id = %s", (sender_id,))
@@ -654,6 +655,7 @@ async def send_message(sid, data):
         "receiverId": receiver_id,
         "content": content,
         "type": msg_type,
+        "mediaUrl": media_url,
         "isDelivered": is_delivered,
         "isRead": False,
         "timestamp": str(datetime.now())
@@ -667,17 +669,24 @@ async def send_message(sid, data):
     try:
         target_uid = int(receiver_id)
         print(f"[FCM] send_message push cagriliyor -> Target UID: {target_uid}")
+        
+        push_body = content
+        if msg_type == "image":
+            push_body = "📷 Fotoğraf" + (f": {content}" if content else "")
+        elif msg_type == "video":
+            push_body = "🎥 Video" + (f": {content}" if content else "")
+
         send_fcm_push(
             user_id=target_uid,
-            title=f"Yeni Mesaj: {sender_name}",
-            body=content if msg_type == "text" else "Yeni bir medya mesajı aldınız.",
+            title=f"{sender_name}",
+            body=push_body,
             data_payload={
                 "type": "message",
                 "messageId": str(msg_id),
                 "senderId": str(sender_id),
                 "receiverId": str(receiver_id),
                 "senderName": sender_name,
-                "content": content,
+                "content": push_body,
             }
         )
     except Exception as e:

@@ -1,10 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../constants/app_colors.dart';
 import '../../models/message_model.dart';
 import '../../models/user_model.dart';
 import '../../models/call_model.dart';
+import '../../services/custom_auth_service.dart';
 import '../../services/custom_chat_service.dart';
 import '../../services/socket_service.dart';
 import '../call/call_screen.dart';
@@ -28,8 +32,10 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final CustomChatService _chatService = CustomChatService();
   final SocketService _socketService = SocketService();
+  final ImagePicker _picker = ImagePicker();
   List<MessageModel> _messages = [];
   bool _isLoading = true;
+  bool _isUploadingMedia = false;
   late UserModel _peer;
 
   @override
@@ -131,15 +137,17 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void _sendMessage() {
-    final text = _messageController.text.trim();
-    if (text.isEmpty) return;
+  void _sendMessage({String? customContent, MessageType type = MessageType.text, String? mediaUrl}) {
+    final text = (customContent ?? _messageController.text).trim();
+    if (text.isEmpty && mediaUrl == null) return;
 
     final newMessage = MessageModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       senderId: widget.currentUser.uid,
       receiverId: widget.peerUser.uid,
       content: text,
+      type: type,
+      mediaUrl: mediaUrl,
       timestamp: DateTime.now(),
       isRead: false,
     );
@@ -149,6 +157,8 @@ class _ChatScreenState extends State<ChatScreen> {
       senderId: widget.currentUser.uid,
       receiverId: widget.peerUser.uid,
       content: text,
+      type: type.name,
+      mediaUrl: mediaUrl,
     );
 
     // 2. Add to local list
@@ -156,7 +166,178 @@ class _ChatScreenState extends State<ChatScreen> {
       _messages.insert(0, newMessage);
     });
 
-    _messageController.clear();
+    if (customContent == null) {
+      _messageController.clear();
+    }
+  }
+
+  // Pick Photo or Video from Camera or Gallery
+  Future<void> _pickAndSendMedia({required ImageSource source, required bool isVideo}) async {
+    try {
+      XFile? file;
+      if (isVideo) {
+        file = await _picker.pickVideo(
+          source: source,
+          maxDuration: const Duration(minutes: 3),
+        );
+      } else {
+        file = await _picker.pickImage(
+          source: source,
+          maxWidth: 1920,
+          maxHeight: 1920,
+          imageQuality: 85,
+        );
+      }
+
+      if (file == null) return;
+
+      setState(() {
+        _isUploadingMedia = true;
+      });
+
+      final authService = Provider.of<CustomAuthService>(context, listen: false);
+      final mediaUrl = await authService.uploadImage(file.path);
+
+      if (mediaUrl != null && mounted) {
+        _sendMessage(
+          customContent: isVideo ? '🎥 Video' : '📷 Fotoğraf',
+          type: isVideo ? MessageType.video : MessageType.image,
+          mediaUrl: mediaUrl,
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Medya yüklenirken bir hata oluştu.'),
+            backgroundColor: AppColors.callRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[MEDIA PICK ERROR] $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingMedia = false;
+        });
+      }
+    }
+  }
+
+  void _showMediaPickerSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildMediaOption(
+                      icon: Icons.camera_alt,
+                      label: 'Fotoğraf Çek',
+                      color: Colors.pinkAccent,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _pickAndSendMedia(source: ImageSource.camera, isVideo: false);
+                      },
+                    ),
+                    _buildMediaOption(
+                      icon: Icons.videocam,
+                      label: 'Video Çek',
+                      color: Colors.deepPurpleAccent,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _pickAndSendMedia(source: ImageSource.camera, isVideo: true);
+                      },
+                    ),
+                    _buildMediaOption(
+                      icon: Icons.photo_library,
+                      label: 'Galeri Foto',
+                      color: Colors.blueAccent,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _pickAndSendMedia(source: ImageSource.gallery, isVideo: false);
+                      },
+                    ),
+                    _buildMediaOption(
+                      icon: Icons.video_library,
+                      label: 'Galeri Video',
+                      color: Colors.green,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _pickAndSendMedia(source: ImageSource.gallery, isVideo: true);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMediaOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: color.withOpacity(0.18),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openFullScreenImage(String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.contain,
+                placeholder: (context, url) => const Center(
+                  child: CircularProgressIndicator(color: AppColors.primaryLight),
+                ),
+                errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _startCall(CallType callType) {
@@ -228,6 +409,25 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          // Uploading banner
+          if (_isUploadingMedia)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+              color: AppColors.primaryLight.withOpacity(0.2),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryLight),
+                  ),
+                  SizedBox(width: 10),
+                  Text('Medya yükleniyor...', style: TextStyle(color: AppColors.primaryLight, fontSize: 13)),
+                ],
+              ),
+            ),
+
           // Message List
           Expanded(
             child: _isLoading
@@ -260,11 +460,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(MessageModel message, bool isMe) {
+    final bool hasMedia = message.mediaUrl != null && message.mediaUrl!.isNotEmpty;
+    final bool isImage = message.type == MessageType.image || (hasMedia && !message.mediaUrl!.endsWith('.mp4'));
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 3),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: EdgeInsets.all(hasMedia ? 4 : 10),
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.78,
         ),
@@ -280,34 +483,90 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              message.content,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                height: 1.3,
+            // Media Container
+            if (hasMedia) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: isImage
+                    ? GestureDetector(
+                        onTap: () => _openFullScreenImage(message.mediaUrl!),
+                        child: CachedNetworkImage(
+                          imageUrl: message.mediaUrl!,
+                          width: double.infinity,
+                          height: 200,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            height: 200,
+                            color: Colors.black12,
+                            child: const Center(child: CircularProgressIndicator(color: AppColors.primaryLight, strokeWidth: 2)),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            height: 200,
+                            color: Colors.black12,
+                            child: const Icon(Icons.broken_image, color: Colors.white54, size: 40),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        height: 180,
+                        color: Colors.black26,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 28,
+                                backgroundColor: AppColors.primaryLight,
+                                child: const Icon(Icons.play_arrow, color: Colors.white, size: 36),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text('Video Mesajı', style: TextStyle(color: Colors.white, fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                      ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  DateFormat('HH:mm').format(message.timestamp),
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
+              if (message.content.isNotEmpty && message.content != '📷 Fotoğraf' && message.content != '🎥 Video')
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(6, 6, 6, 2),
+                  child: Text(
+                    message.content,
+                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
                   ),
                 ),
-                if (isMe) ...[
-                  const SizedBox(width: 4),
-                  Icon(
-                    (message.isRead || message.isDelivered) ? Icons.done_all : Icons.done,
-                    size: 15,
-                    color: message.isRead ? AppColors.accent : AppColors.textSecondary,
+            ] else ...[
+              Text(
+                message.content,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 15,
+                  height: 1.3,
+                ),
+              ),
+            ],
+            const SizedBox(height: 4),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: hasMedia ? 4 : 0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('HH:mm').format(message.timestamp),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
                   ),
+                  if (isMe) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      (message.isRead || message.isDelivered) ? Icons.done_all : Icons.done,
+                      size: 15,
+                      color: message.isRead ? AppColors.accent : AppColors.textSecondary,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ],
         ),
@@ -323,8 +582,12 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.emoji_emotions_outlined, color: AppColors.textSecondary),
-              onPressed: () {},
+              icon: const Icon(Icons.attach_file, color: AppColors.textSecondary),
+              onPressed: _showMediaPickerSheet,
+            ),
+            IconButton(
+              icon: const Icon(Icons.camera_alt, color: AppColors.primaryLight),
+              onPressed: () => _pickAndSendMedia(source: ImageSource.camera, isVideo: false),
             ),
             Expanded(
               child: Container(
@@ -353,7 +616,7 @@ class _ChatScreenState extends State<ChatScreen> {
               backgroundColor: AppColors.primaryLight,
               child: IconButton(
                 icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                onPressed: _sendMessage,
+                onPressed: () => _sendMessage(),
               ),
             ),
           ],

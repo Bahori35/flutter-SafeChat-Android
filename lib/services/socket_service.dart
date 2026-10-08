@@ -57,12 +57,18 @@ class SocketService {
     socket!.on('receive_message', (data) {
       debugPrint('[SOCKET] Received Message: $data');
       if (data != null) {
+        final typeStr = data['type']?.toString() ?? 'text';
+        final msgType = MessageType.values.firstWhere(
+          (e) => e.name == typeStr,
+          orElse: () => MessageType.text,
+        );
+
         final message = MessageModel(
           id: data['id'].toString(),
           senderId: data['senderId'].toString(),
           receiverId: data['receiverId'].toString(),
           content: data['content'] ?? '',
-          type: MessageType.text,
+          type: msgType,
           timestamp: DateTime.tryParse(data['timestamp'] ?? '') ?? DateTime.now(),
           isDelivered: true,
           isRead: data['isRead'] == 1 || data['isRead'] == true,
@@ -161,6 +167,7 @@ class SocketService {
     required String receiverId,
     required String content,
     String type = 'text',
+    String? mediaUrl,
   }) {
     if (socket != null && socket!.connected) {
       socket!.emit('send_message', {
@@ -168,6 +175,7 @@ class SocketService {
         'receiverId': receiverId,
         'content': content,
         'type': type,
+        if (mediaUrl != null) 'mediaUrl': mediaUrl,
       });
     }
   }
