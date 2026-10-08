@@ -114,6 +114,7 @@ def init_db():
                 display_name VARCHAR(100) NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
                 photo_url VARCHAR(255) DEFAULT '',
+                phone_number VARCHAR(30) DEFAULT '',
                 status VARCHAR(255) DEFAULT 'Hey there! I am using this app.',
                 fcm_token TEXT NULL,
                 is_online BOOLEAN DEFAULT FALSE,
@@ -121,6 +122,11 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
+
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN phone_number VARCHAR(30) DEFAULT '';")
+            except Exception:
+                pass
 
             try:
                 cursor.execute("ALTER TABLE users ADD COLUMN fcm_token TEXT NULL;")
@@ -215,6 +221,7 @@ class RegisterRequest(BaseModel):
     username: str
     password: str
     displayName: Optional[str] = ""
+    phoneNumber: Optional[str] = ""
 
 class LoginRequest(BaseModel):
     username: str
@@ -228,6 +235,10 @@ class MessageDeliveredRequest(BaseModel):
     receiverId: int
     senderId: Optional[int] = None
     messageId: Optional[int] = None
+
+class SyncContactsRequest(BaseModel):
+    userId: int
+    phoneNumbers: list[str]
 
 @app.get("/api/calls/pending/{userId}")
 def get_pending_call(userId: str):
@@ -262,6 +273,7 @@ class UpdateProfileRequest(BaseModel):
     displayName: Optional[str] = None
     photoUrl: Optional[str] = None
     status: Optional[str] = None
+    phoneNumber: Optional[str] = None
 
 @app.post("/api/users/profile")
 def update_profile(req: UpdateProfileRequest):
@@ -276,10 +288,11 @@ def update_profile(req: UpdateProfileRequest):
         new_name = req.displayName.strip() if req.displayName is not None and req.displayName.strip() else user["display_name"]
         new_photo = req.photoUrl.strip() if req.photoUrl is not None and req.photoUrl.strip() else user["photo_url"]
         new_status = req.status.strip() if req.status is not None else user["status"]
+        new_phone = req.phoneNumber.strip() if req.phoneNumber is not None else user.get("phone_number", "")
 
         cursor.execute(
-            "UPDATE users SET display_name = %s, photo_url = %s, status = %s WHERE id = %s",
-            (new_name, new_photo, new_status, req.userId)
+            "UPDATE users SET display_name = %s, photo_url = %s, status = %s, phone_number = %s WHERE id = %s",
+            (new_name, new_photo, new_status, new_phone, req.userId)
         )
         cursor.execute("SELECT * FROM users WHERE id = %s", (req.userId,))
         updated_user = cursor.fetchone()
@@ -293,6 +306,7 @@ def update_profile(req: UpdateProfileRequest):
             "username": updated_user["username"],
             "displayName": updated_user["display_name"],
             "photoUrl": updated_user["photo_url"],
+            "phoneNumber": updated_user.get("phone_number", ""),
             "status": updated_user["status"],
             "isOnline": updated_user["is_online"] == 1
         }
@@ -329,6 +343,7 @@ async def report_delivered_rest(req: MessageDeliveredRequest):
 @app.post("/api/auth/register")
 def register(req: RegisterRequest):
     clean_username = req.username.strip().lower()
+    clean_phone = req.phoneNumber.strip() if req.phoneNumber else ""
     conn = get_db_connection()
     with conn.cursor() as cursor:
         cursor.execute("SELECT id FROM users WHERE username = %s", (clean_username,))
@@ -341,8 +356,8 @@ def register(req: RegisterRequest):
         photo_url = f"https://ui-avatars.com/api/?name={name}&background=075E54&color=fff"
 
         cursor.execute(
-            "INSERT INTO users (username, display_name, password_hash, photo_url) VALUES (%s, %s, %s, %s)",
-            (clean_username, name, hashed_pw, photo_url)
+            "INSERT INTO users (username, display_name, password_hash, photo_url, phone_number) VALUES (%s, %s, %s, %s, %s)",
+            (clean_username, name, hashed_pw, photo_url, clean_phone)
         )
         user_id = cursor.lastrowid
 
@@ -356,6 +371,7 @@ def register(req: RegisterRequest):
             "username": clean_username,
             "displayName": name,
             "photoUrl": photo_url,
+            "phoneNumber": clean_phone,
             "isOnline": True
         }
     }
@@ -383,6 +399,7 @@ def login(req: LoginRequest):
             "username": user["username"],
             "displayName": user["display_name"],
             "photoUrl": user["photo_url"],
+            "phoneNumber": user.get("phone_number", ""),
             "status": user["status"],
             "isOnline": True
         }
@@ -393,7 +410,7 @@ def get_users(currentUserId: Optional[int] = 0):
     conn = get_db_connection()
     with conn.cursor() as cursor:
         cursor.execute(
-            "SELECT id, username, display_name AS displayName, photo_url AS photoUrl, status, is_online AS isOnline, last_seen AS lastSeen FROM users WHERE id != %s",
+            "SELECT id, username, display_name AS displayName, photo_url AS photoUrl, phone_number AS phoneNumber, status, is_online AS isOnline, last_seen AS lastSeen FROM users WHERE id != %s",
             (currentUserId,)
         )
         users = cursor.fetchall()
@@ -405,6 +422,48 @@ def get_users(currentUserId: Optional[int] = 0):
         u["isOnline"] = uid_str in active_sockets
 
     return users
+
+def normalize_phone(p: str) -> str:
+    # keep only digits
+    digits = "".join(filter(str.isdigit, p))
+    # if starts with 90, take last 10 digits
+    if len(digits) >= 10:
+        return digits[-10:]
+    return digits
+
+@app.post("/api/users/sync-contacts")
+def sync_contacts(req: SyncContactsRequest):
+    if not req.phoneNumbers:
+        return []
+
+    # Normalize client phone numbers
+    normalized_map = {}
+    for raw in req.phoneNumbers:
+        norm = normalize_phone(raw)
+        if norm:
+            normalized_map[norm] = raw
+
+    if not normalized_map:
+        return []
+
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, username, display_name AS displayName, photo_url AS photoUrl, phone_number AS phoneNumber, status, is_online AS isOnline, last_seen AS lastSeen FROM users WHERE id != %s AND phone_number != ''",
+            (req.userId,)
+        )
+        all_users = cursor.fetchall()
+    conn.close()
+
+    matched_users = []
+    for u in all_users:
+        user_norm = normalize_phone(u.get("phoneNumber") or "")
+        if user_norm and user_norm in normalized_map:
+            uid_str = str(u["id"])
+            u["isOnline"] = uid_str in active_sockets
+            matched_users.append(u)
+
+    return matched_users
 
 @app.get("/api/messages/{user1}/{user2}")
 def get_messages(user1: int, user2: int):

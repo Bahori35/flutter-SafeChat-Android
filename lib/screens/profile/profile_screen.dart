@@ -17,6 +17,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _statusController;
   late TextEditingController _photoController;
+  late TextEditingController _phoneController;
   bool _isUploading = false;
   final ImagePicker _picker = ImagePicker();
 
@@ -39,6 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _nameController = TextEditingController(text: user?.displayName ?? '');
     _statusController = TextEditingController(text: user?.status ?? 'Hey there! I am using this app.');
     _photoController = TextEditingController(text: user?.photoUrl ?? '');
+    _phoneController = TextEditingController(text: user?.phoneNumber ?? '');
   }
 
   @override
@@ -46,6 +48,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _nameController.dispose();
     _statusController.dispose();
     _photoController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -116,6 +119,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         displayName: _nameController.text.trim(),
         photoUrl: _photoController.text.trim(),
         status: _statusController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
       );
 
       if (!mounted) return;
@@ -373,6 +377,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   labelText: 'Hakkımda / Durum',
                   labelStyle: TextStyle(color: AppColors.primaryLight),
                   prefixIcon: Icon(Icons.info_outline, color: AppColors.primaryLight),
+                  border: UnderlineInputBorder(),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.surfaceLight)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryLight, width: 2)),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Phone Number Field
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: const InputDecoration(
+                  labelText: 'Telefon Numarası (Rehber Eşleşmesi İçin)',
+                  hintText: 'Örn: 05xxxxxxxxx',
+                  hintStyle: TextStyle(color: AppColors.textSecondary),
+                  labelStyle: TextStyle(color: AppColors.primaryLight),
+                  prefixIcon: Icon(Icons.phone_outlined, color: AppColors.primaryLight),
                   border: UnderlineInputBorder(),
                   enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.surfaceLight)),
                   focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryLight, width: 2)),

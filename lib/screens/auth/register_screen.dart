@@ -14,6 +14,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _displayNameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
@@ -22,6 +23,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _usernameController.dispose();
     _displayNameController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -34,6 +36,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         username: _usernameController.text.trim(),
         displayName: _displayNameController.text.trim(),
         password: _passwordController.text,
+        phoneNumber: _phoneController.text.trim(),
       );
 
       if (error != null && mounted) {
@@ -147,6 +150,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       }
                       return null;
                     },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Phone Number Input (Optional)
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    decoration: InputDecoration(
+                      labelText: 'Telefon Numarası (Örn: 05xxxxxxxxx)',
+                      hintText: 'Rehber eşleşmesi için (İsteğe bağlı)',
+                      hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                      labelStyle: const TextStyle(color: AppColors.textSecondary),
+                      prefixIcon: const Icon(Icons.phone_outlined, color: AppColors.primaryLight),
+                      filled: true,
+                      fillColor: AppColors.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.primaryLight, width: 1.5),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
 

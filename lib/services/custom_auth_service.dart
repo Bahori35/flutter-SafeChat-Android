@@ -92,6 +92,7 @@ class CustomAuthService extends ChangeNotifier {
     required String username,
     required String password,
     required String displayName,
+    String phoneNumber = '',
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -104,6 +105,7 @@ class CustomAuthService extends ChangeNotifier {
           'username': username.trim().toLowerCase(),
           'password': password,
           'displayName': displayName.trim().isEmpty ? username : displayName.trim(),
+          'phoneNumber': phoneNumber.trim(),
         }),
       ).timeout(const Duration(seconds: 10));
 
@@ -123,6 +125,7 @@ class CustomAuthService extends ChangeNotifier {
             email: '${data['user']['username']}@custom.server',
             displayName: data['user']['displayName'],
             photoUrl: data['user']['photoUrl'] ?? '',
+            phoneNumber: data['user']['phoneNumber'] ?? '',
             isOnline: true,
           );
           await _saveSession(_currentUser!, _token!);
@@ -179,6 +182,7 @@ class CustomAuthService extends ChangeNotifier {
             email: '${data['user']['username']}@custom.server',
             displayName: data['user']['displayName'],
             photoUrl: data['user']['photoUrl'] ?? '',
+            phoneNumber: data['user']['phoneNumber'] ?? '',
             status: data['user']['status'] ?? 'Hey there! I am using this app.',
             isOnline: true,
           );
@@ -207,6 +211,7 @@ class CustomAuthService extends ChangeNotifier {
     required String displayName,
     required String photoUrl,
     required String status,
+    String? phoneNumber,
   }) async {
     if (_currentUser == null) return "Giriş yapılmamış.";
     _isLoading = true;
@@ -221,6 +226,7 @@ class CustomAuthService extends ChangeNotifier {
           'displayName': displayName.trim(),
           'photoUrl': photoUrl.trim(),
           'status': status.trim(),
+          if (phoneNumber != null) 'phoneNumber': phoneNumber.trim(),
         }),
       ).timeout(const Duration(seconds: 10));
 
@@ -233,6 +239,7 @@ class CustomAuthService extends ChangeNotifier {
             displayName: data['user']['displayName'],
             photoUrl: data['user']['photoUrl'],
             status: data['user']['status'],
+            phoneNumber: data['user']['phoneNumber'] ?? _currentUser!.phoneNumber,
           );
           if (_token != null) {
             await _saveSession(_currentUser!, _token!);

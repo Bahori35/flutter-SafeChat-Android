@@ -6,6 +6,7 @@ class UserModel {
   final String email;
   final String displayName;
   final String photoUrl;
+  final String phoneNumber;
   final String status;
   final bool isOnline;
   final DateTime? lastSeen;
@@ -16,6 +17,7 @@ class UserModel {
     required this.email,
     required this.displayName,
     this.photoUrl = '',
+    this.phoneNumber = '',
     this.status = 'Hey there! I am using this app.',
     this.isOnline = false,
     this.lastSeen,
@@ -28,6 +30,7 @@ class UserModel {
       'email': email,
       'displayName': displayName,
       'photoUrl': photoUrl,
+      'phoneNumber': phoneNumber,
       'status': status,
       'isOnline': isOnline,
       'lastSeen': lastSeen?.toIso8601String(),
@@ -50,6 +53,7 @@ class UserModel {
       email: map['email'] ?? '',
       displayName: map['displayName'] ?? map['username'] ?? 'User',
       photoUrl: map['photoUrl'] ?? '',
+      phoneNumber: map['phoneNumber'] ?? '',
       status: map['status'] ?? 'Hey there! I am using this app.',
       isOnline: map['isOnline'] == true || map['isOnline'] == 1,
       lastSeen: parsedLastSeen,
@@ -62,6 +66,7 @@ class UserModel {
     String? email,
     String? displayName,
     String? photoUrl,
+    String? phoneNumber,
     String? status,
     bool? isOnline,
     DateTime? lastSeen,
@@ -72,6 +77,7 @@ class UserModel {
       email: email ?? this.email,
       displayName: displayName ?? this.displayName,
       photoUrl: photoUrl ?? this.photoUrl,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       status: status ?? this.status,
       isOnline: isOnline ?? this.isOnline,
       lastSeen: lastSeen ?? this.lastSeen,

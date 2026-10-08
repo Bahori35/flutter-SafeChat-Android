@@ -133,4 +133,40 @@ class CustomChatService {
       return false;
     }
   }
+
+  // --- CONTACTS SYNC METHOD ---
+  Future<List<UserModel>> syncContacts({
+    required int userId,
+    required List<String> phoneNumbers,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/users/sync-contacts'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'userId': userId,
+          'phoneNumbers': phoneNumbers,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) {
+          return UserModel(
+            uid: json['id'].toString(),
+            username: json['username'] ?? '',
+            email: '${json['username']}@custom.server',
+            displayName: json['displayName'] ?? json['username'] ?? 'User',
+            photoUrl: json['photoUrl'] ?? '',
+            phoneNumber: json['phoneNumber'] ?? '',
+            status: json['status'] ?? 'Hey there! I am using this app.',
+            isOnline: json['isOnline'] == 1 || json['isOnline'] == true,
+          );
+        }).toList();
+      }
+    } catch (e) {
+      debugPrint('Error syncing contacts: $e');
+    }
+    return [];
+  }
 }

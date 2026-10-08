@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 
 import '../../constants/app_colors.dart';
 import '../../models/user_model.dart';
@@ -36,6 +37,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   String _searchQuery = '';
   List<UserModel> _users = [];
   bool _isLoadingUsers = true;
+
+  // Phone Contacts Match
+  List<UserModel> _phoneContacts = [];
+  bool _isSyncingContacts = false;
+  bool _hasContactPermission = false;
 
   // Story state
   List<UserStoryGroup> _storyGroups = [];
@@ -289,6 +295,84 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         setState(() {
           _users = users;
           _isLoadingUsers = false;
+        });
+      }
+      _syncDeviceContacts(silent: true);
+    }
+  }
+
+  Future<void> _syncDeviceContacts({bool silent = false}) async {
+    final authService = Provider.of<CustomAuthService>(context, listen: false);
+    final currentUser = authService.currentUser;
+    if (currentUser == null) return;
+
+    if (!silent) {
+      setState(() {
+        _isSyncingContacts = true;
+      });
+    }
+
+    try {
+      bool permission = await FlutterContacts.requestPermission(readonly: true);
+      if (mounted) {
+        setState(() {
+          _hasContactPermission = permission;
+        });
+      }
+
+      if (permission) {
+        List<Contact> contacts = await FlutterContacts.getContacts(withProperties: true, withPhoto: false);
+        List<String> rawNumbers = [];
+        for (var contact in contacts) {
+          for (var phone in contact.phones) {
+            if (phone.number.isNotEmpty) {
+              rawNumbers.add(phone.number);
+            }
+          }
+        }
+
+        final myUid = int.tryParse(currentUser.uid) ?? 0;
+        final matched = await _chatService.syncContacts(
+          userId: myUid,
+          phoneNumbers: rawNumbers,
+        );
+
+        if (mounted) {
+          setState(() {
+            _phoneContacts = matched;
+            _isSyncingContacts = false;
+          });
+          if (!silent) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${matched.length} rehber kişisi uygulamada bulundu!'),
+                backgroundColor: AppColors.primaryLight,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isSyncingContacts = false;
+          });
+          if (!silent) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Rehber izni verilmedi. Ayarlardan izin verebilirsiniz.'),
+                backgroundColor: AppColors.callRed,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[CONTACTS] Sync error: $e');
+      if (mounted) {
+        setState(() {
+          _isSyncingContacts = false;
         });
       }
     }
@@ -946,49 +1030,203 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // Users Tab
+  // Users / Contacts Tab
   Widget _buildUsersTab(UserModel currentUser) {
     if (_isLoadingUsers) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primaryLight));
     }
 
     var filteredUsers = _users;
+    var filteredPhoneContacts = _phoneContacts;
+
     if (_searchQuery.isNotEmpty) {
       filteredUsers = filteredUsers
           .where((u) =>
               u.displayName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              u.username.toLowerCase().contains(_searchQuery.toLowerCase()))
+              u.username.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              u.phoneNumber.contains(_searchQuery))
+          .toList();
+
+      filteredPhoneContacts = filteredPhoneContacts
+          .where((u) =>
+              u.displayName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              u.username.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              u.phoneNumber.contains(_searchQuery))
           .toList();
     }
 
-    return ListView.builder(
-      itemCount: filteredUsers.length,
-      itemBuilder: (context, index) {
-        final user = filteredUsers[index];
-        return ListTile(
-          leading: CircleAvatar(
-            radius: 24,
-            backgroundImage: CachedNetworkImageProvider(user.photoUrl),
+    return RefreshIndicator(
+      color: AppColors.primaryLight,
+      onRefresh: () async {
+        _loadUsers();
+      },
+      child: ListView(
+        children: [
+          // Header: Sync Contacts Action Tile
+          ListTile(
+            onTap: _isSyncingContacts ? null : () => _syncDeviceContacts(silent: false),
+            leading: CircleAvatar(
+              radius: 22,
+              backgroundColor: AppColors.surfaceLight,
+              child: _isSyncingContacts
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(color: AppColors.primaryLight, strokeWidth: 2),
+                    )
+                  : const Icon(Icons.contacts, color: AppColors.primaryLight),
+            ),
+            title: const Text('Rehberi Yenile / Eşitle', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 15)),
+            subtitle: Text(
+              _phoneContacts.isNotEmpty
+                  ? 'Rehberinizden ${_phoneContacts.length} kişi bu uygulamayı kullanıyor'
+                  : 'Rehberinizdeki kişileri otomatik eşleştirin',
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+            trailing: const Icon(Icons.sync, color: AppColors.primaryLight),
           ),
-          title: Text(user.displayName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
-          subtitle: Text('@${user.username} • ${user.isOnline ? "Çevrimiçi" : "Çevrimdışı"}',
-              style: TextStyle(
-                color: user.isOnline ? AppColors.primaryLight : AppColors.textSecondary,
-                fontSize: 13,
-              )),
-          trailing: IconButton(
-            icon: const Icon(Icons.chat, color: AppColors.primaryLight),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatScreen(peerUser: user, currentUser: currentUser),
+          const Divider(color: AppColors.surface),
+
+          // Section 1: Phone Contacts using the app
+          if (filteredPhoneContacts.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+              child: Text(
+                'Rehberinizdeki Kullanıcılar',
+                style: TextStyle(color: AppColors.primaryLight, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+            ...filteredPhoneContacts.map((user) {
+              return ListTile(
+                leading: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppColors.surfaceLight,
+                      backgroundImage: CachedNetworkImageProvider(user.photoUrl),
+                    ),
+                    if (user.isOnline)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.background, width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                title: Text(user.displayName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+                subtitle: Text(
+                  '${user.phoneNumber.isNotEmpty ? user.phoneNumber : "@${user.username}"} • ${user.isOnline ? "Çevrimiçi" : "Çevrimdışı"}',
+                  style: TextStyle(
+                    color: user.isOnline ? AppColors.primaryLight : AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.call, color: AppColors.primaryLight, size: 22),
+                      onPressed: () => _startAudioOrVideoCall(user, CallType.audio),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chat, color: AppColors.primaryLight, size: 22),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(peerUser: user, currentUser: currentUser),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               );
-            },
+            }),
+            const Divider(color: AppColors.surface),
+          ],
+
+          // Section 2: All registered application users
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+            child: Text(
+              'Tüm Kayıtlı Kullanıcılar',
+              style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
           ),
-        );
-      },
+          if (filteredUsers.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Center(
+                child: Text('Kullanıcı bulunamadı', style: TextStyle(color: AppColors.textSecondary)),
+              ),
+            )
+          else
+            ...filteredUsers.map((user) {
+              return ListTile(
+                leading: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppColors.surfaceLight,
+                      backgroundImage: CachedNetworkImageProvider(user.photoUrl),
+                    ),
+                    if (user.isOnline)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.background, width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                title: Text(user.displayName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+                subtitle: Text(
+                  '@${user.username} ${user.phoneNumber.isNotEmpty ? "• ${user.phoneNumber}" : ""} • ${user.isOnline ? "Çevrimiçi" : "Çevrimdışı"}',
+                  style: TextStyle(
+                    color: user.isOnline ? AppColors.primaryLight : AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.call, color: AppColors.primaryLight, size: 22),
+                      onPressed: () => _startAudioOrVideoCall(user, CallType.audio),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chat, color: AppColors.primaryLight, size: 22),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(peerUser: user, currentUser: currentUser),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
     );
   }
 
