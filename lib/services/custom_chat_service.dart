@@ -137,7 +137,7 @@ class CustomChatService {
   // --- CONTACTS SYNC METHOD ---
   Future<List<UserModel>> syncContacts({
     required int userId,
-    required List<String> phoneNumbers,
+    required List<Map<String, String>> contacts,
   }) async {
     try {
       final response = await http.post(
@@ -145,7 +145,7 @@ class CustomChatService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'userId': userId,
-          'phoneNumbers': phoneNumbers,
+          'contacts': contacts,
         }),
       ).timeout(const Duration(seconds: 10));
 

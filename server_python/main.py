@@ -199,6 +199,14 @@ def init_db():
 
 init_db()
 
+def normalize_phone(phone_str: str) -> str:
+    if not phone_str:
+        return ""
+    digits = "".join(c for c in phone_str if c.isdigit())
+    if len(digits) >= 10:
+        return digits[-10:]
+    return digits
+
 # Socket.IO & FastAPI App
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 app = FastAPI(title="Chat & Call MariaDB Backend")
@@ -236,212 +244,25 @@ class MessageDeliveredRequest(BaseModel):
     senderId: Optional[int] = None
     messageId: Optional[int] = None
 
+class ContactEntry(BaseModel):
+    phone: str
+    name: Optional[str] = ""
+
 class SyncContactsRequest(BaseModel):
     userId: int
-    phoneNumbers: list[str]
-
-@app.get("/api/calls/pending/{userId}")
-def get_pending_call(userId: str):
-    call_data = active_pending_calls.get(str(userId))
-    return {"hasPendingCall": call_data is not None, "callData": call_data}
-
-# Create uploads directory if not exists
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    try:
-        ext = os.path.splitext(file.filename)[1]
-        if not ext:
-            ext = ".jpg"
-        unique_filename = f"{uuid.uuid4().hex}{ext}"
-        file_path = os.path.join(UPLOAD_DIR, unique_filename)
-        
-        contents = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(contents)
-            
-        public_url = f"http://46.197.188.20:3000/uploads/{unique_filename}"
-        return {"status": "success", "url": public_url}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Dosya yuklenemedi: {e}")
-
-class UpdateProfileRequest(BaseModel):
-    userId: int
-    displayName: Optional[str] = None
-    photoUrl: Optional[str] = None
-    status: Optional[str] = None
-    phoneNumber: Optional[str] = None
-
-@app.post("/api/users/profile")
-def update_profile(req: UpdateProfileRequest):
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT * FROM users WHERE id = %s", (req.userId,))
-        user = cursor.fetchone()
-        if not user:
-            conn.close()
-            raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
-
-        new_name = req.displayName.strip() if req.displayName is not None and req.displayName.strip() else user["display_name"]
-        new_photo = req.photoUrl.strip() if req.photoUrl is not None and req.photoUrl.strip() else user["photo_url"]
-        new_status = req.status.strip() if req.status is not None else user["status"]
-        new_phone = req.phoneNumber.strip() if req.phoneNumber is not None else user.get("phone_number", "")
-
-        cursor.execute(
-            "UPDATE users SET display_name = %s, photo_url = %s, status = %s, phone_number = %s WHERE id = %s",
-            (new_name, new_photo, new_status, new_phone, req.userId)
-        )
-        cursor.execute("SELECT * FROM users WHERE id = %s", (req.userId,))
-        updated_user = cursor.fetchone()
-    conn.close()
-
-    return {
-        "status": "success",
-        "message": "Profil başarıyla güncellendi",
-        "user": {
-            "id": updated_user["id"],
-            "username": updated_user["username"],
-            "displayName": updated_user["display_name"],
-            "photoUrl": updated_user["photo_url"],
-            "phoneNumber": updated_user.get("phone_number", ""),
-            "status": updated_user["status"],
-            "isOnline": updated_user["is_online"] == 1
-        }
-    }
-
-@app.post("/api/users/fcm-token")
-def update_fcm_token(req: FcmTokenRequest):
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("UPDATE users SET fcm_token = %s WHERE id = %s", (req.fcmToken, req.userId))
-    conn.close()
-    return {"status": "success", "message": "FCM Token guncellendi"}
-
-@app.post("/api/messages/delivered")
-async def report_delivered_rest(req: MessageDeliveredRequest):
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        if req.messageId:
-            cursor.execute("UPDATE messages SET is_delivered = 1 WHERE id = %s", (req.messageId,))
-        elif req.senderId and req.receiverId:
-            cursor.execute("UPDATE messages SET is_delivered = 1 WHERE sender_id = %s AND receiver_id = %s", (req.senderId, req.receiverId))
-        else:
-            cursor.execute("UPDATE messages SET is_delivered = 1 WHERE receiver_id = %s", (req.receiverId,))
-    conn.close()
-
-    if req.senderId:
-        sender_sid = active_sockets.get(str(req.senderId))
-        if sender_sid:
-            await sio.emit("messages_delivered", {"senderId": str(req.senderId), "receiverId": str(req.receiverId), "messageId": req.messageId}, to=sender_sid)
-
-    return {"status": "success"}
-
-
-@app.post("/api/auth/register")
-def register(req: RegisterRequest):
-    clean_username = req.username.strip().lower()
-    clean_phone = req.phoneNumber.strip() if req.phoneNumber else ""
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT id FROM users WHERE username = %s", (clean_username,))
-        if cursor.fetchone():
-            conn.close()
-            raise HTTPException(status_code=400, detail="Bu kullanıcı adı zaten alınmış.")
-
-        hashed_pw = hash_password(req.password)
-        name = req.displayName.strip() if req.displayName else clean_username
-        photo_url = f"https://ui-avatars.com/api/?name={name}&background=075E54&color=fff"
-
-        cursor.execute(
-            "INSERT INTO users (username, display_name, password_hash, photo_url, phone_number) VALUES (%s, %s, %s, %s, %s)",
-            (clean_username, name, hashed_pw, photo_url, clean_phone)
-        )
-        user_id = cursor.lastrowid
-
-    conn.close()
-    token = jwt.encode({"id": user_id, "username": clean_username}, SECRET_KEY, algorithm="HS256")
-    return {
-        "message": "Kayıt başarılı",
-        "token": token,
-        "user": {
-            "id": user_id,
-            "username": clean_username,
-            "displayName": name,
-            "photoUrl": photo_url,
-            "phoneNumber": clean_phone,
-            "isOnline": True
-        }
-    }
-
-@app.post("/api/auth/login")
-def login(req: LoginRequest):
-    clean_username = req.username.strip().lower()
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT * FROM users WHERE username = %s", (clean_username,))
-        user = cursor.fetchone()
-        if not user or not verify_password(req.password, user["password_hash"]):
-            conn.close()
-            raise HTTPException(status_code=400, detail="Kullanıcı adı veya şifre hatalı.")
-
-        cursor.execute("UPDATE users SET is_online = TRUE WHERE id = %s", (user["id"],))
-
-    conn.close()
-    token = jwt.encode({"id": user["id"], "username": user["username"]}, SECRET_KEY, algorithm="HS256")
-    return {
-        "message": "Giriş başarılı",
-        "token": token,
-        "user": {
-            "id": user["id"],
-            "username": user["username"],
-            "displayName": user["display_name"],
-            "photoUrl": user["photo_url"],
-            "phoneNumber": user.get("phone_number", ""),
-            "status": user["status"],
-            "isOnline": True
-        }
-    }
-
-@app.get("/api/users")
-def get_users(currentUserId: Optional[int] = 0):
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute(
-            "SELECT id, username, display_name AS displayName, photo_url AS photoUrl, phone_number AS phoneNumber, status, is_online AS isOnline, last_seen AS lastSeen FROM users WHERE id != %s",
-            (currentUserId,)
-        )
-        users = cursor.fetchall()
-    conn.close()
-
-    # Dynamically match online status from real-time connected sockets
-    for u in users:
-        uid_str = str(u["id"])
-        u["isOnline"] = uid_str in active_sockets
-
-    return users
-
-def normalize_phone(p: str) -> str:
-    # keep only digits
-    digits = "".join(filter(str.isdigit, p))
-    # if starts with 90, take last 10 digits
-    if len(digits) >= 10:
-        return digits[-10:]
-    return digits
+    contacts: list[ContactEntry]
 
 @app.post("/api/users/sync-contacts")
 def sync_contacts(req: SyncContactsRequest):
-    if not req.phoneNumbers:
+    if not req.contacts:
         return []
 
-    # Normalize client phone numbers
+    # Map normalized phone number -> local contact name
     normalized_map = {}
-    for raw in req.phoneNumbers:
-        norm = normalize_phone(raw)
+    for entry in req.contacts:
+        norm = normalize_phone(entry.phone)
         if norm:
-            normalized_map[norm] = raw
+            normalized_map[norm] = entry.name.strip() if entry.name and entry.name.strip() else ""
 
     if not normalized_map:
         return []
@@ -461,6 +282,10 @@ def sync_contacts(req: SyncContactsRequest):
         if user_norm and user_norm in normalized_map:
             uid_str = str(u["id"])
             u["isOnline"] = uid_str in active_sockets
+            # If the user saved this contact with a local phonebook name, use that name!
+            local_name = normalized_map[user_norm]
+            if local_name:
+                u["displayName"] = local_name
             matched_users.append(u)
 
     return matched_users

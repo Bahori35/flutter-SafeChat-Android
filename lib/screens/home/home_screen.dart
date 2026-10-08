@@ -70,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _socketService.onMessageReceived = (message) {
           String senderDisplayName = message.senderName ?? 'Yeni Mesaj';
           try {
-            final senderObj = _users.firstWhere((u) => u.uid == message.senderId);
+            final senderObj = _phoneContacts.firstWhere((u) => u.uid == message.senderId);
             senderDisplayName = senderObj.displayName;
           } catch (_) {}
 
@@ -91,9 +91,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _socketService.onUserStatusChange = (userId, isOnline) {
           if (mounted) {
             setState(() {
-              final index = _users.indexWhere((u) => u.uid == userId);
-              if (index != -1) {
-                _users[index] = _users[index].copyWith(isOnline: isOnline);
+              final phoneIdx = _phoneContacts.indexWhere((u) => u.uid == userId);
+              if (phoneIdx != -1) {
+                _phoneContacts[phoneIdx] = _phoneContacts[phoneIdx].copyWith(isOnline: isOnline);
               }
             });
           }
@@ -178,11 +178,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final callTypeStr = callData['callType'] ?? 'video';
     final offer = Map<String, dynamic>.from(callData['offer']);
 
+    final callerUid = callerData['uid'].toString();
+    String callerDisplayName = callerData['displayName'] ?? callerData['username'] ?? 'User';
+    try {
+      final matchedContact = _phoneContacts.firstWhere((u) => u.uid == callerUid);
+      callerDisplayName = matchedContact.displayName;
+    } catch (_) {}
+
     final callerUser = UserModel(
-      uid: callerData['uid'].toString(),
+      uid: callerUid,
       username: callerData['username'] ?? 'User',
       email: '',
-      displayName: callerData['displayName'] ?? callerData['username'] ?? 'User',
+      displayName: callerDisplayName,
       photoUrl: callerData['photoUrl'] ?? '',
     );
 
@@ -282,22 +289,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         );
       },
     );
-
-
   }
 
   void _loadUsers() async {
     final authService = Provider.of<CustomAuthService>(context, listen: false);
     final currentUser = authService.currentUser;
     if (currentUser != null) {
-      final users = await _chatService.getUsers(currentUser.uid);
+      await _syncDeviceContacts(silent: true);
       if (mounted) {
         setState(() {
-          _users = users;
           _isLoadingUsers = false;
         });
       }
-      _syncDeviceContacts(silent: true);
     }
   }
 
@@ -322,11 +325,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
       if (permission) {
         List<Contact> contacts = await FlutterContacts.getContacts(withProperties: true, withPhoto: false);
-        List<String> rawNumbers = [];
+        List<Map<String, String>> contactList = [];
         for (var contact in contacts) {
           for (var phone in contact.phones) {
-            if (phone.number.isNotEmpty) {
-              rawNumbers.add(phone.number);
+            final num = phone.number.trim();
+            if (num.isNotEmpty) {
+              contactList.add({
+                'phone': num,
+                'name': contact.displayName.trim().isNotEmpty ? contact.displayName.trim() : '',
+              });
             }
           }
         }
@@ -334,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         final myUid = int.tryParse(currentUser.uid) ?? 0;
         final matched = await _chatService.syncContacts(
           userId: myUid,
-          phoneNumbers: rawNumbers,
+          contacts: contactList,
         );
 
         if (mounted) {
@@ -809,19 +816,43 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       return const Center(child: CircularProgressIndicator(color: AppColors.primaryLight));
     }
 
-    var filteredUsers = _users;
+    // Only show contacts from user's phonebook
+    var filteredUsers = _phoneContacts;
     if (_searchQuery.isNotEmpty) {
       filteredUsers = filteredUsers
           .where((u) =>
               u.displayName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              u.username.toLowerCase().contains(_searchQuery.toLowerCase()))
+              u.username.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              u.phoneNumber.contains(_searchQuery))
           .toList();
     }
+
+    // Story groups filtered only to phone contacts + myself
+    final allowedStoryGroups = _storyGroups.where((g) {
+      return g.userId.toString() == currentUser.uid ||
+          _phoneContacts.any((c) => c.uid == g.userId.toString());
+    }).map((g) {
+      if (g.userId.toString() != currentUser.uid) {
+        try {
+          final matched = _phoneContacts.firstWhere((c) => c.uid == g.userId.toString());
+          return UserStoryGroup(
+            userId: g.userId,
+            username: g.username,
+            displayName: matched.displayName,
+            userPhotoUrl: g.userPhotoUrl,
+            stories: g.stories,
+            allViewed: g.allViewed,
+            latestTimestamp: g.latestTimestamp,
+          );
+        } catch (_) {}
+      }
+      return g;
+    }).toList();
 
     return Column(
       children: [
         // Top Horizontal Story Avatar Bar (Instagram / Modern WhatsApp Style)
-        if (_storyGroups.isNotEmpty || true)
+        if (allowedStoryGroups.isNotEmpty)
           Container(
             height: 96,
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -836,7 +867,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 GestureDetector(
                   onTap: () {
                     final myUid = currentUser.uid;
-                    final myIdx = _storyGroups.indexWhere((g) => g.userId.toString() == myUid);
+                    final myIdx = allowedStoryGroups.indexWhere((g) => g.userId.toString() == myUid);
                     if (myIdx != -1) {
                       _openStoryViewer(myIdx, currentUser);
                     } else {
@@ -854,7 +885,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               padding: const EdgeInsets.all(2.5),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: _storyGroups.any((g) => g.userId.toString() == currentUser.uid)
+                                border: allowedStoryGroups.any((g) => g.userId.toString() == currentUser.uid)
                                     ? Border.all(color: AppColors.primaryLight, width: 2.5)
                                     : null,
                               ),
@@ -869,7 +900,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     : null,
                               ),
                             ),
-                            if (!_storyGroups.any((g) => g.userId.toString() == currentUser.uid))
+                            if (!allowedStoryGroups.any((g) => g.userId.toString() == currentUser.uid))
                               Positioned(
                                 bottom: 0,
                                 right: 0,
@@ -894,9 +925,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                 ),
 
-                // Other Users Stories
-                ..._storyGroups.where((g) => g.userId.toString() != currentUser.uid).map((group) {
-                  final groupIdx = _storyGroups.indexOf(group);
+                // Other Users Stories (Only Rehberdeki Kişiler)
+                ...allowedStoryGroups.where((g) => g.userId.toString() != currentUser.uid).map((group) {
+                  final groupIdx = allowedStoryGroups.indexOf(group);
                   return GestureDetector(
                     onTap: () => _openStoryViewer(groupIdx, currentUser),
                     child: Padding(
@@ -944,16 +975,39 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ),
 
-        // Chat List
+        // Chat List (Only Phone Contacts)
         Expanded(
           child: filteredUsers.isEmpty
-              ? const Center(
+              ? Center(
                   child: Padding(
-                    padding: EdgeInsets.all(24.0),
-                    child: Text(
-                      'Henüz sohbet bulunmuyor.\nKişiler sekmesinden birini seçip konuşmaya başlayın!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.textSecondary, height: 1.5, fontSize: 15),
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.contact_phone_outlined, size: 60, color: AppColors.textMuted),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Rehberinizden Henüz Kimse Bulunamadı',
+                          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Sadece telefon rehberinizde kayıtlı olan ve uygulamayı kullanan kişiler burada görünür.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryLight,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () => _syncDeviceContacts(silent: false),
+                          icon: const Icon(Icons.sync),
+                          label: const Text('Rehberi Yenile'),
+                        ),
+                      ],
                     ),
                   ),
                 )
@@ -1030,23 +1084,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // Users / Contacts Tab
+  // Users / Contacts Tab - ONLY Phone Contacts with Local Names
   Widget _buildUsersTab(UserModel currentUser) {
     if (_isLoadingUsers) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primaryLight));
     }
 
-    var filteredUsers = _users;
     var filteredPhoneContacts = _phoneContacts;
 
     if (_searchQuery.isNotEmpty) {
-      filteredUsers = filteredUsers
-          .where((u) =>
-              u.displayName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              u.username.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              u.phoneNumber.contains(_searchQuery))
-          .toList();
-
       filteredPhoneContacts = filteredPhoneContacts
           .where((u) =>
               u.displayName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -1058,7 +1104,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return RefreshIndicator(
       color: AppColors.primaryLight,
       onRefresh: () async {
-        _loadUsers();
+        await _syncDeviceContacts(silent: false);
       },
       child: ListView(
         children: [
@@ -1087,13 +1133,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           const Divider(color: AppColors.surface),
 
-          // Section 1: Phone Contacts using the app
+          // Section: Phone Contacts using the app
           if (filteredPhoneContacts.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
               child: Text(
-                'Rehberinizdeki Kullanıcılar',
-                style: TextStyle(color: AppColors.primaryLight, fontWeight: FontWeight.bold, fontSize: 13),
+                'Rehberinizdeki Kişiler (${filteredPhoneContacts.length})',
+                style: const TextStyle(color: AppColors.primaryLight, fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ),
             ...filteredPhoneContacts.map((user) {
@@ -1151,80 +1197,41 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               );
             }),
-            const Divider(color: AppColors.surface),
-          ],
-
-          // Section 2: All registered application users
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
-            child: Text(
-              'Tüm Kayıtlı Kullanıcılar',
-              style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-          ),
-          if (filteredUsers.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24.0),
-              child: Center(
-                child: Text('Kullanıcı bulunamadı', style: TextStyle(color: AppColors.textSecondary)),
-              ),
-            )
-          else
-            ...filteredUsers.map((user) {
-              return ListTile(
-                leading: Stack(
+          ] else ...[
+            const SizedBox(height: 40),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: AppColors.surfaceLight,
-                      backgroundImage: CachedNetworkImageProvider(user.photoUrl),
+                    const Icon(Icons.perm_contact_calendar_outlined, size: 64, color: AppColors.textMuted),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Rehberinizde kayıtlı kullanıcı bulunamadı',
+                      style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
                     ),
-                    if (user.isOnline)
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryLight,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.background, width: 2),
-                          ),
-                        ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Yalnızca telefon rehberinizde kayıtlı olup bu uygulamaya kayıt olmuş kişiler burada listelenir.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryLight,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                  ],
-                ),
-                title: Text(user.displayName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
-                subtitle: Text(
-                  '@${user.username} ${user.phoneNumber.isNotEmpty ? "• ${user.phoneNumber}" : ""} • ${user.isOnline ? "Çevrimiçi" : "Çevrimdışı"}',
-                  style: TextStyle(
-                    color: user.isOnline ? AppColors.primaryLight : AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.call, color: AppColors.primaryLight, size: 22),
-                      onPressed: () => _startAudioOrVideoCall(user, CallType.audio),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.chat, color: AppColors.primaryLight, size: 22),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatScreen(peerUser: user, currentUser: currentUser),
-                          ),
-                        );
-                      },
+                      onPressed: () => _syncDeviceContacts(silent: false),
+                      icon: const Icon(Icons.sync),
+                      label: const Text('Rehberi Yeniden Eşitle'),
                     ),
                   ],
                 ),
-              );
-            }),
+              ),
+            ),
+          ],
         ],
       ),
     );
