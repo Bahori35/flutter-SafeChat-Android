@@ -391,7 +391,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-
         actions: [
           IconButton(
             icon: const Icon(Icons.videocam, color: AppColors.textPrimary),
@@ -510,17 +509,17 @@ class _ChatScreenState extends State<ChatScreen> {
                     : Container(
                         height: 180,
                         color: Colors.black26,
-                        child: Center(
+                        child: const Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               CircleAvatar(
                                 radius: 28,
                                 backgroundColor: AppColors.primaryLight,
-                                child: const Icon(Icons.play_arrow, color: Colors.white, size: 36),
+                                child: Icon(Icons.play_arrow, color: Colors.white, size: 36),
                               ),
-                              const SizedBox(height: 8),
-                              const Text('Video Mesajı', style: TextStyle(color: Colors.white, fontSize: 13)),
+                              SizedBox(height: 8),
+                              Text('Video Mesajı', style: TextStyle(color: Colors.white, fontSize: 13)),
                             ],
                           ),
                         ),
