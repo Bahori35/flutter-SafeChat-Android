@@ -101,7 +101,7 @@ class _CallScreenState extends State<CallScreen> {
     _isSpeaker = isVideo;
     Helper.setSpeakerphoneOn(_isSpeaker);
 
-    // 2. Capture Local Camera & Audio Stream (Optimized for High Quality & Low Bandwidth)
+    // 2. Capture Local Camera & Audio Stream (Adaptive 1080p Full HD to 480p dynamic scaling)
     try {
       final Map<String, dynamic> constraints = {
         'audio': {
@@ -116,14 +116,15 @@ class _CallScreenState extends State<CallScreen> {
                 'mandatory': {
                   'minWidth': '640',
                   'minHeight': '480',
-                  'maxWidth': '1280',
-                  'maxHeight': '720',
+                  'maxWidth': '1920',
+                  'maxHeight': '1080',
                   'minFrameRate': '15',
-                  'maxFrameRate': '24',
+                  'maxFrameRate': '30',
                 },
                 'optional': [
                   {'googCpuOveruseDetection': true},
                   {'googHighpassFilter': true},
+                  {'googNoiseReduction': true},
                 ],
               }
             : false,
@@ -190,13 +191,13 @@ class _CallScreenState extends State<CallScreen> {
       }
     };
 
-    // Helper to optimize SDP for crystal clear VP8/VP9/H264 video with low bandwidth target (~800kbps)
+    // Helper to optimize SDP with dynamic adaptive bitrate (Auto 1080p -> 720p -> 480p)
+    // Limits max bandwidth to 1800 kbps (Full HD) while letting WebRTC BWE automatically scale down to 300kbps when internet slows down.
     String _optimizeSdpBitrate(String sdp, bool isVideoCall) {
       if (!isVideoCall) return sdp;
-      // Set target video bitrate to 800 kbps (saves 60% data while keeping 720p HD crystal clear)
       return sdp.replaceAllMapped(
         RegExp(r'(m=video .*\r\n)'),
-        (match) => '${match.group(0)}b=AS:800\r\n',
+        (match) => '${match.group(0)}b=AS:1800\r\n',
       );
     }
 
@@ -227,7 +228,7 @@ class _CallScreenState extends State<CallScreen> {
         'offerToReceiveVideo': isVideo ? 1 : 0,
       });
 
-      // Apply bitrate & bandwidth optimization
+      // Apply dynamic adaptive bandwidth optimization
       String optimizedSdp = _optimizeSdpBitrate(offer.sdp ?? '', isVideo);
       RTCSessionDescription optimizedOffer = RTCSessionDescription(optimizedSdp, offer.type);
 
@@ -259,7 +260,7 @@ class _CallScreenState extends State<CallScreen> {
           'offerToReceiveVideo': isVideo ? 1 : 0,
         });
 
-        // Apply bitrate & bandwidth optimization
+        // Apply dynamic adaptive bandwidth optimization
         String optimizedSdp = _optimizeSdpBitrate(answer.sdp ?? '', isVideo);
         RTCSessionDescription optimizedAnswer = RTCSessionDescription(optimizedSdp, answer.type);
 
