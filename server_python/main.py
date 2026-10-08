@@ -441,6 +441,48 @@ def get_messages(user1: int, user2: int):
     conn.close()
     return messages
 
+# --- CALL LOGS ENDPOINTS ---
+class SaveCallLogRequest(BaseModel):
+    callerId: int
+    receiverId: int
+    callType: str  # 'audio' or 'video'
+    callStatus: str  # 'missed', 'accepted', 'rejected', 'ended'
+    durationSeconds: Optional[int] = 0
+
+@app.post("/api/calls/logs")
+def save_call_log(req: SaveCallLogRequest):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """INSERT INTO call_logs (caller_id, receiver_id, call_type, call_status, duration_seconds)
+               VALUES (%s, %s, %s, %s, %s)""",
+            (req.callerId, req.receiverId, req.callType, req.callStatus, req.durationSeconds)
+        )
+        log_id = cursor.lastrowid
+    conn.close()
+    return {"status": "success", "callLogId": log_id}
+
+@app.get("/api/calls/logs/{userId}")
+def get_call_logs(userId: int):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """SELECT cl.id, cl.caller_id AS callerId, cl.receiver_id AS receiverId,
+                      cl.call_type AS callType, cl.call_status AS callStatus,
+                      cl.duration_seconds AS durationSeconds, cl.created_at AS createdAt,
+                      u_caller.display_name AS callerName, u_caller.photo_url AS callerPic,
+                      u_receiver.display_name AS receiverName, u_receiver.photo_url AS receiverPic
+               FROM call_logs cl
+               JOIN users u_caller ON cl.caller_id = u_caller.id
+               JOIN users u_receiver ON cl.receiver_id = u_receiver.id
+               WHERE cl.caller_id = %s OR cl.receiver_id = %s
+               ORDER BY cl.created_at DESC""",
+            (userId, userId)
+        )
+        logs = cursor.fetchall()
+    conn.close()
+    return logs
+
 # --- STORY / DURUM (STATUS) ENDPOINTS ---
 
 class CreateStoryRequest(BaseModel):

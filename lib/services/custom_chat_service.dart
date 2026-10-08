@@ -169,4 +169,47 @@ class CustomChatService {
     }
     return [];
   }
+
+  // --- CALL LOGS API METHODS ---
+  Future<bool> saveCallLog({
+    required int callerId,
+    required int receiverId,
+    required String callType,
+    required String callStatus,
+    int durationSeconds = 0,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/calls/logs'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'callerId': callerId,
+          'receiverId': receiverId,
+          'callType': callType,
+          'callStatus': callStatus,
+          'durationSeconds': durationSeconds,
+        }),
+      ).timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('[CALL LOG] Error saving log: $e');
+      return false;
+    }
+  }
+
+  Future<List<CallModel>> getCallLogs(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/calls/logs/$userId'),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => CallModel.fromJson(json)).toList();
+      }
+    } catch (e) {
+      debugPrint('[CALL LOG] Error fetching logs: $e');
+    }
+    return [];
+  }
 }

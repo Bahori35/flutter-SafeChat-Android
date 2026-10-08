@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:intl/intl.dart';
 
 import '../../constants/app_colors.dart';
 import '../../models/user_model.dart';
@@ -46,6 +47,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   // Story state
   List<UserStoryGroup> _storyGroups = [];
   bool _isLoadingStories = true;
+
+  // Call Logs state
+  List<CallModel> _callLogs = [];
+  bool _isLoadingCalls = true;
 
   @override
   void initState() {
@@ -101,11 +106,35 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
         _loadUsers();
         _loadStories();
+        _loadCallLogs();
 
         // Check if there is an incoming call waiting for us (e.g. app was launched from notification)
         _checkPendingIncomingCall(currentUser);
       }
     });
+  }
+
+  void _loadCallLogs() async {
+    try {
+      final authService = Provider.of<CustomAuthService>(context, listen: false);
+      final currentUser = authService.currentUser;
+      if (currentUser != null) {
+        final logs = await _chatService.getCallLogs(currentUser.uid);
+        if (mounted) {
+          setState(() {
+            _callLogs = logs;
+            _isLoadingCalls = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('[HOME] Call logs load error: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingCalls = false;
+        });
+      }
+    }
   }
 
   void _loadStories() async {
@@ -392,12 +421,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  void _startAudioOrVideoCall(UserModel peerUser, CallType callType) {
+  void _startAudioOrVideoCall(UserModel peerUser, CallType callType) async {
     final authService = Provider.of<CustomAuthService>(context, listen: false);
     final currentUser = authService.currentUser;
     if (currentUser == null) return;
 
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => CallScreen(
@@ -408,6 +437,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
       ),
     );
+
+    _loadCallLogs();
   }
 
   @override
@@ -1239,28 +1270,133 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // Calls Tab
   Widget _buildCallsTab(UserModel currentUser) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.video_call_rounded, size: 70, color: AppColors.textMuted),
-            const SizedBox(height: 16),
-            const Text(
-              'Arkadaşlarınla sesli veya görüntülü konuş!',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+    if (_isLoadingCalls) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primaryLight));
+    }
+
+    return RefreshIndicator(
+      color: AppColors.primaryLight,
+      onRefresh: () async {
+        _loadCallLogs();
+      },
+      child: _callLogs.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.phone_missed_rounded, size: 70, color: AppColors.textMuted),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Henüz Arama Kaydı Yok',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Kişilerinizle yaptığınız tüm sesli ve görüntülü konuşmalar\nve konuşma süreleri burada listelenir.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : ListView.separated(
+              itemCount: _callLogs.length,
+              separatorBuilder: (ctx, i) => const Divider(color: AppColors.surface, height: 1, indent: 76),
+              itemBuilder: (context, index) {
+                final log = _callLogs[index];
+                final isOutgoing = log.callerId == currentUser.uid;
+
+                final otherUserId = isOutgoing ? log.receiverId : log.callerId;
+                String otherUserName = isOutgoing ? log.receiverName : log.callerName;
+                String otherUserPic = isOutgoing ? log.receiverPic : log.callerPic;
+
+                // Priority: match with user's local phonebook name if available
+                try {
+                  final matched = _phoneContacts.firstWhere((c) => c.uid == otherUserId);
+                  otherUserName = matched.displayName;
+                  otherUserPic = matched.photoUrl;
+                } catch (_) {}
+
+                final bool isMissed = log.callStatus == CallStatus.missed || (log.durationSeconds == 0 && !isOutgoing);
+                final bool isVideo = log.callType == CallType.video;
+
+                IconData callDirectionIcon;
+                Color callDirectionColor;
+
+                if (isOutgoing) {
+                  callDirectionIcon = Icons.call_made_rounded;
+                  callDirectionColor = AppColors.primaryLight;
+                } else if (isMissed) {
+                  callDirectionIcon = Icons.call_missed_rounded;
+                  callDirectionColor = AppColors.callRed;
+                } else {
+                  callDirectionIcon = Icons.call_received_rounded;
+                  callDirectionColor = AppColors.callGreen;
+                }
+
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: CircleAvatar(
+                    radius: 24,
+                    backgroundColor: AppColors.surfaceLight,
+                    backgroundImage: otherUserPic.isNotEmpty ? CachedNetworkImageProvider(otherUserPic) : null,
+                    child: otherUserPic.isEmpty ? const Icon(Icons.person, color: AppColors.textSecondary) : null,
+                  ),
+                  title: Text(
+                    otherUserName,
+                    style: TextStyle(
+                      color: isMissed ? AppColors.callRed : AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: Row(
+                    children: [
+                      Icon(callDirectionIcon, color: callDirectionColor, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        DateFormat('dd MMM, HH:mm').format(log.timestamp),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                      ),
+                      if (log.durationSeconds > 0) ...[
+                        const Text(' • ', style: TextStyle(color: AppColors.textSecondary)),
+                        Text(
+                          log.formattedDuration,
+                          style: const TextStyle(color: AppColors.primaryLight, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ] else if (isMissed) ...[
+                        const Text(' • ', style: TextStyle(color: AppColors.textSecondary)),
+                        const Text(
+                          'Cevapsız',
+                          style: TextStyle(color: AppColors.callRed, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ],
+                  ),
+                  trailing: IconButton(
+                    icon: Icon(
+                      isVideo ? Icons.videocam : Icons.call,
+                      color: AppColors.primaryLight,
+                      size: 24,
+                    ),
+                    onPressed: () {
+                      final targetUser = UserModel(
+                        uid: otherUserId,
+                        username: otherUserName,
+                        email: '',
+                        displayName: otherUserName,
+                        photoUrl: otherUserPic,
+                      );
+                      _startAudioOrVideoCall(targetUser, log.callType);
+                    },
+                  ),
+                );
+              },
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Herhangi bir kişinin yanındaki arama butonuna basarak\nanında HD WebRTC görüşmesi başlatabilirsiniz.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

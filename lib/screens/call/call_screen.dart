@@ -5,9 +5,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../constants/app_colors.dart';
 import '../../models/call_model.dart';
 import '../../models/user_model.dart';
+import '../../services/custom_chat_service.dart';
 import '../../services/socket_service.dart';
 import '../../services/notification_service.dart';
-
 
 class CallScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -31,6 +31,7 @@ class CallScreen extends StatefulWidget {
 
 class _CallScreenState extends State<CallScreen> {
   final SocketService _socketService = SocketService();
+  final CustomChatService _chatService = CustomChatService();
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
 
@@ -42,6 +43,11 @@ class _CallScreenState extends State<CallScreen> {
   bool _isSpeaker = true;
   bool _hasRemoteStream = false;
   String _callStatusText = 'Bağlanıyor...';
+
+  // Call duration and status tracking
+  Timer? _durationTimer;
+  int _callDurationSeconds = 0;
+  bool _isCallConnected = false;
 
   final List<RTCIceCandidate> _pendingIceCandidates = [];
 
@@ -67,6 +73,22 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     _initWebRTC();
+  }
+
+  void _startDurationTimer() {
+    if (_isCallConnected) return;
+    _isCallConnected = true;
+    _durationTimer?.cancel();
+    _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _callDurationSeconds++;
+          final minutes = (_callDurationSeconds ~/ 60).toString().padLeft(2, '0');
+          final seconds = (_callDurationSeconds % 60).toString().padLeft(2, '0');
+          _callStatusText = '$minutes:$seconds';
+        });
+      }
+    });
   }
 
   void _initWebRTC() async {
@@ -116,8 +138,8 @@ class _CallScreenState extends State<CallScreen> {
         setState(() {
           _remoteRenderer.srcObject = event.streams[0];
           _hasRemoteStream = true;
-          _callStatusText = 'Görüşme Başladı';
         });
+        _startDurationTimer();
       }
     };
 
@@ -179,9 +201,7 @@ class _CallScreenState extends State<CallScreen> {
           }
           _pendingIceCandidates.clear();
 
-          setState(() {
-            _callStatusText = 'Görüşme Başladı';
-          });
+          _startDurationTimer();
         }
       };
 
@@ -223,9 +243,7 @@ class _CallScreenState extends State<CallScreen> {
           answer: answer.toMap(),
         );
 
-        setState(() {
-          _callStatusText = 'Görüşme Başladı';
-        });
+        _startDurationTimer();
       }
     }
   }
@@ -267,11 +285,29 @@ class _CallScreenState extends State<CallScreen> {
     if (_isEnding) return;
     _isEnding = true;
 
+    _durationTimer?.cancel();
     NotificationService().stopRingtone();
     NotificationService().cancelCallNotification(9999);
 
     if (notifyPeer) {
       _socketService.emitEndCall(widget.peerUser.uid);
+    }
+
+    // Save call log to database (Caller saves the record)
+    if (widget.isCaller) {
+      final callerId = int.tryParse(widget.currentUser.uid) ?? 0;
+      final receiverId = int.tryParse(widget.peerUser.uid) ?? 0;
+      final callStatusStr = _isCallConnected
+          ? 'ended'
+          : (_callDurationSeconds > 0 ? 'accepted' : 'missed');
+
+      _chatService.saveCallLog(
+        callerId: callerId,
+        receiverId: receiverId,
+        callType: widget.callType == CallType.video ? 'video' : 'audio',
+        callStatus: callStatusStr,
+        durationSeconds: _callDurationSeconds,
+      );
     }
 
 
