@@ -161,6 +161,31 @@ def init_db():
                 FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
             );
             """)
+
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS stories (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                media_url TEXT NOT NULL,
+                caption TEXT NULL,
+                media_type ENUM('image', 'video', 'text') DEFAULT 'image',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            """)
+
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS story_views (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                story_id INT NOT NULL,
+                viewer_id INT NOT NULL,
+                viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_story_viewer (story_id, viewer_id),
+                FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE,
+                FOREIGN KEY (viewer_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            """)
         conn.close()
         print("[OK] MariaDB baglantisi ve tablolar hazir!")
     except Exception as e:
@@ -395,6 +420,120 @@ def get_messages(user1: int, user2: int):
         messages = cursor.fetchall()
     conn.close()
     return messages
+
+# --- STORY / DURUM (STATUS) ENDPOINTS ---
+
+class CreateStoryRequest(BaseModel):
+    userId: int
+    mediaUrl: str
+    caption: Optional[str] = ""
+    mediaType: Optional[str] = "image"
+
+class StoryViewRequest(BaseModel):
+    storyId: int
+    viewerId: int
+
+@app.post("/api/stories")
+def create_story(req: CreateStoryRequest):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """INSERT INTO stories (user_id, media_url, caption, media_type, expires_at)
+               VALUES (%s, %s, %s, %s, DATE_ADD(NOW(), INTERVAL 24 HOUR))""",
+            (req.userId, req.mediaUrl, req.caption, req.mediaType)
+        )
+        story_id = cursor.lastrowid
+        cursor.execute(
+            """SELECT s.id, s.user_id AS userId, s.media_url AS mediaUrl, s.caption, s.media_type AS mediaType,
+                      s.created_at AS createdAt, s.expires_at AS expiresAt,
+                      u.username, u.display_name AS displayName, u.photo_url AS userPhotoUrl
+               FROM stories s
+               JOIN users u ON s.user_id = u.id
+               WHERE s.id = %s""",
+            (story_id,)
+        )
+        story = cursor.fetchone()
+    conn.close()
+    return {"status": "success", "story": story}
+
+@app.get("/api/stories")
+def get_stories(currentUserId: Optional[int] = 0):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        # Get all non-expired stories (within 24 hours)
+        cursor.execute(
+            """SELECT s.id, s.user_id AS userId, s.media_url AS mediaUrl, s.caption, s.media_type AS mediaType,
+                      s.created_at AS createdAt, s.expires_at AS expiresAt,
+                      u.username, u.display_name AS displayName, u.photo_url AS userPhotoUrl,
+                      (SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id AND sv.viewer_id = %s) > 0 AS isViewed,
+                      (SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id) AS viewCount
+               FROM stories s
+               JOIN users u ON s.user_id = u.id
+               WHERE s.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+               ORDER BY s.created_at ASC""",
+            (currentUserId,)
+        )
+        stories = cursor.fetchall()
+
+    conn.close()
+
+    # Group stories by user
+    grouped = {}
+    for st in stories:
+        uid = st["userId"]
+        if uid not in grouped:
+            grouped[uid] = {
+                "userId": uid,
+                "username": st["username"],
+                "displayName": st["displayName"],
+                "userPhotoUrl": st["userPhotoUrl"],
+                "stories": [],
+                "allViewed": True,
+                "latestTimestamp": st["createdAt"]
+            }
+        
+        is_viewed = bool(st["isViewed"])
+        if not is_viewed and uid != currentUserId:
+            grouped[uid]["allViewed"] = False
+
+        grouped[uid]["latestTimestamp"] = st["createdAt"]
+        grouped[uid]["stories"].append({
+            "id": st["id"],
+            "userId": st["userId"],
+            "mediaUrl": st["mediaUrl"],
+            "caption": st["caption"] or "",
+            "mediaType": st["mediaType"],
+            "createdAt": str(st["createdAt"]),
+            "isViewed": is_viewed,
+            "viewCount": st["viewCount"]
+        })
+
+    # Sort so currentUser is handled or recent ones are first
+    result = list(grouped.values())
+    result.sort(key=lambda x: x["latestTimestamp"], reverse=True)
+    return result
+
+@app.post("/api/stories/view")
+def view_story(req: StoryViewRequest):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        try:
+            cursor.execute(
+                "INSERT IGNORE INTO story_views (story_id, viewer_id) VALUES (%s, %s)",
+                (req.storyId, req.viewerId)
+            )
+        except Exception as e:
+            print(f"[STORY VIEW ERR] {e}")
+    conn.close()
+    return {"status": "success"}
+
+@app.delete("/api/stories/{storyId}")
+def delete_story(storyId: int, userId: int):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("DELETE FROM stories WHERE id = %s AND user_id = %s", (storyId, userId))
+    conn.close()
+    return {"status": "success"}
 
 # --- SOCKET.IO REALTIME & WEBRTC SIGNALING ---
 
