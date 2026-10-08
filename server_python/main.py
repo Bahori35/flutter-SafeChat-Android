@@ -244,6 +244,142 @@ class MessageDeliveredRequest(BaseModel):
     senderId: Optional[int] = None
     messageId: Optional[int] = None
 
+class ProfileUpdateRequest(BaseModel):
+    userId: int
+    displayName: str
+    photoUrl: str
+    status: str
+    phoneNumber: Optional[str] = ""
+
+# Static file serving for uploads
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# --- AUTH & USER ENDPOINTS ---
+
+@app.post("/api/auth/register")
+def register(req: RegisterRequest):
+    if not req.username or not req.password:
+        raise HTTPException(status_code=400, detail="Kullanıcı adı ve şifre zorunludur.")
+
+    clean_username = req.username.strip().lower()
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT id FROM users WHERE username = %s", (clean_username,))
+        if cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=400, detail="Bu kullanıcı adı zaten alınmış.")
+
+        pwd_hash = hash_password(req.password)
+        name = req.displayName.strip() if req.displayName and req.displayName.strip() else clean_username
+        photo_url = f"https://ui-avatars.com/api/?name={name}&background=075E54&color=fff"
+        phone = req.phoneNumber.strip() if req.phoneNumber else ""
+
+        cursor.execute(
+            """INSERT INTO users (username, display_name, password_hash, photo_url, phone_number, is_online)
+               VALUES (%s, %s, %s, %s, %s, 1)""",
+            (clean_username, name, pwd_hash, photo_url, phone)
+        )
+        user_id = cursor.lastrowid
+
+    conn.close()
+
+    token = jwt.encode({"id": user_id, "username": clean_username}, SECRET_KEY, algorithm="HS256")
+
+    return {
+        "message": "Kayıt başarılı.",
+        "token": token,
+        "user": {
+            "id": user_id,
+            "username": clean_username,
+            "displayName": name,
+            "photoUrl": photo_url,
+            "phoneNumber": phone,
+            "isOnline": True
+        }
+    }
+
+@app.post("/api/auth/login")
+def login(req: LoginRequest):
+    if not req.username or not req.password:
+        raise HTTPException(status_code=400, detail="Kullanıcı adı ve şifre zorunludur.")
+
+    clean_username = req.username.strip().lower()
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM users WHERE username = %s", (clean_username,))
+        user = cursor.fetchone()
+
+        if not user or not verify_password(req.password, user["password_hash"]):
+            conn.close()
+            raise HTTPException(status_code=400, detail="Kullanıcı adı veya şifre hatalı.")
+
+        cursor.execute("UPDATE users SET is_online = 1 WHERE id = %s", (user["id"],))
+
+    conn.close()
+
+    token = jwt.encode({"id": user["id"], "username": clean_username}, SECRET_KEY, algorithm="HS256")
+
+    return {
+        "message": "Giriş başarılı.",
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "displayName": user["display_name"],
+            "photoUrl": user["photo_url"] or "",
+            "phoneNumber": user.get("phone_number") or "",
+            "status": user.get("status") or "Hey there! I am using this app.",
+            "isOnline": True
+        }
+    }
+
+@app.post("/api/users/profile")
+def update_profile(req: ProfileUpdateRequest):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """UPDATE users 
+               SET display_name = %s, photo_url = %s, status = %s, phone_number = %s 
+               WHERE id = %s""",
+            (req.displayName, req.photoUrl, req.status, req.phoneNumber or "", req.userId)
+        )
+        cursor.execute("SELECT id, username, display_name AS displayName, photo_url AS photoUrl, phone_number AS phoneNumber, status FROM users WHERE id = %s", (req.userId,))
+        updated_user = cursor.fetchone()
+    conn.close()
+
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+
+    return {"status": "success", "user": updated_user}
+
+@app.post("/api/users/fcm-token")
+def update_fcm_token(req: FcmTokenRequest):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("UPDATE users SET fcm_token = %s WHERE id = %s", (req.fcmToken, req.userId))
+    conn.close()
+    return {"status": "success"}
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    os.makedirs("uploads", exist_ok=True)
+    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    file_path = os.path.join("uploads", filename)
+
+    with open(file_path, "wb") as f:
+        content = await file.read()
+        f.write(content)
+
+    return {"status": "success", "url": f"http://46.197.188.20:3000/uploads/{filename}"}
+
+@app.get("/api/calls/pending/{userId}")
+def get_pending_call(userId: str):
+    if userId in active_pending_calls:
+        return {"hasPendingCall": True, "callData": active_pending_calls[userId]}
+    return {"hasPendingCall": False, "callData": None}
+
 class ContactEntry(BaseModel):
     phone: str
     name: Optional[str] = ""
