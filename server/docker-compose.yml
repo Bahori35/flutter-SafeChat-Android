@@ -31,7 +31,7 @@ services:
       DB_PASSWORD: chatpassword
       DB_NAME: chat_app_db
       DB_PORT: 3306
-      JWT_SECRET: super_secret_jwt_key_whatsapp_clone_2026
+      JWT_SECRET: super_secret_jwt_key_safechat_2026
     depends_on:
       - mariadb
 

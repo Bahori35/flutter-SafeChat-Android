@@ -1,6 +1,6 @@
 {
-    "name": "flutter_whatsapp_clone",
-    "short_name": "flutter_whatsapp_clone",
+    "name": "SafeChat",
+    "short_name": "SafeChat",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

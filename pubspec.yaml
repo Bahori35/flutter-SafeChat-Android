@@ -1,5 +1,5 @@
 name: flutter_whatsapp_clone
-description: "A WhatsApp-like Voice/Video Calling and Messaging Application built with Flutter & Firebase."
+description: "SafeChat - Secure Voice/Video Calling and Messaging Application built with Flutter & Firebase."
 publish_to: 'none'
 version: 1.0.0+1
 

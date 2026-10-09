@@ -29,7 +29,7 @@ class NotificationService {
     if (androidImplementation != null) {
       await androidImplementation.createNotificationChannel(
         const AndroidNotificationChannel(
-          'whatsapp_messages',
+          'safechat_messages',
           'Mesajlar',
           description: 'Gelen anlık sohbet mesajları',
           importance: Importance.max,
@@ -40,7 +40,7 @@ class NotificationService {
 
       await androidImplementation.createNotificationChannel(
         const AndroidNotificationChannel(
-          'whatsapp_system_call_ringtone_channel',
+          'safechat_system_call_ringtone_channel',
           'Gelen Telefon Aramaları',
           description: 'Telefonun kendi varsayılan arama zil sesi ile çalan arama kanalı',
           importance: Importance.max,
@@ -59,7 +59,7 @@ class NotificationService {
     required String messageContent,
   }) async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'whatsapp_messages',
+      'safechat_messages',
       'Mesajlar',
       channelDescription: 'Gelen anlık sohbet mesajları',
       importance: Importance.max,
@@ -93,7 +93,7 @@ class NotificationService {
     required String callType,
   }) async {
     final AndroidNotificationDetails androidCallDetails = AndroidNotificationDetails(
-      'whatsapp_system_call_ringtone_channel',
+      'safechat_system_call_ringtone_channel',
       'Gelen Telefon Aramaları',
       channelDescription: 'Telefonun kendi varsayılan arama zil sesi ile çalan arama kanalı',
       importance: Importance.max,
