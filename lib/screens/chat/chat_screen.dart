@@ -472,30 +472,51 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: AppColors.chatBackground,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
-        leadingWidth: 32,
+        leadingWidth: 40,
         titleSpacing: 0,
         elevation: 0,
         title: Row(
           children: [
-            CircleAvatar(
-              radius: 19,
-              backgroundImage: CachedNetworkImageProvider(_peer.photoUrl),
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: AppColors.surfaceLight,
+                  backgroundImage: CachedNetworkImageProvider(_peer.photoUrl),
+                ),
+                if (_peer.isOnline)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: AppColors.onlineGreen,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.surface, width: 2),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     _peer.displayName,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     _peer.isOnline ? 'Çevrimiçi' : 'Çevrimdışı',
                     style: TextStyle(
                       fontSize: 12,
-                      color: _peer.isOnline ? AppColors.primaryLight : AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                      color: _peer.isOnline ? AppColors.onlineGreen : AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -505,17 +526,28 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.videocam, color: AppColors.textPrimary),
+            icon: Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.videocam_rounded, color: AppColors.accent, size: 20),
+            ),
             onPressed: () => _startCall(CallType.video),
           ),
           IconButton(
-            icon: const Icon(Icons.call, color: AppColors.textPrimary),
+            icon: Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.call_rounded, color: AppColors.primaryLight, size: 18),
+            ),
             onPressed: () => _startCall(CallType.audio),
           ),
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
-            onPressed: () {},
-          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
@@ -523,18 +555,23 @@ class _ChatScreenState extends State<ChatScreen> {
           // Uploading banner
           if (_isUploadingMedia)
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-              color: AppColors.primaryLight.withOpacity(0.2),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+              ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryLight),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
                   ),
                   SizedBox(width: 10),
-                  Text('Medya yükleniyor...', style: TextStyle(color: AppColors.primaryLight, fontSize: 13)),
+                  Text('Dosya yükleniyor...', style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
@@ -544,16 +581,37 @@ class _ChatScreenState extends State<ChatScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primaryLight))
                 : _messages.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'Sohbete başlayın 👋',
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 70,
+                              height: 70,
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.cardBorder),
+                              ),
+                              child: const Icon(Icons.waving_hand_rounded, size: 34, color: AppColors.accent),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Sohbete Başlayın 👋',
+                              style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Mesajlarınız uçtan uca güvenlidir.',
+                              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                            ),
+                          ],
                         ),
                       )
                     : ListView.builder(
                         reverse: true,
                         controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         itemCount: _messages.length,
                         itemBuilder: (context, index) {
                           final message = _messages[index];
@@ -577,7 +635,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final ext = fileName.contains('.') ? fileName.split('.').last.toUpperCase() : 'DOC';
 
     return InkWell(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(12),
       onTap: () {
         if (message.mediaUrl != null && message.mediaUrl!.isNotEmpty) {
           _openDocument(message.mediaUrl!);
@@ -586,8 +644,8 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(10),
+          color: Colors.black.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
@@ -596,7 +654,7 @@ class _ChatScreenState extends State<ChatScreen> {
               height: 42,
               decoration: BoxDecoration(
                 color: docColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(docIcon, color: docColor, size: 24),
             ),
@@ -610,7 +668,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: AppColors.textPrimary,
+                      color: Colors.white,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
@@ -619,7 +677,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Text(
                     '$ext • İndir / Aç',
                     style: const TextStyle(
-                      color: AppColors.textSecondary,
+                      color: Colors.white70,
                       fontSize: 11,
                     ),
                   ),
@@ -629,10 +687,10 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(width: 8),
             CircleAvatar(
               radius: 15,
-              backgroundColor: AppColors.primaryLight.withOpacity(0.2),
+              backgroundColor: Colors.white.withOpacity(0.2),
               child: const Icon(
-                Icons.arrow_downward,
-                color: AppColors.primaryLight,
+                Icons.arrow_downward_rounded,
+                color: Colors.white,
                 size: 16,
               ),
             ),
@@ -650,19 +708,28 @@ class _ChatScreenState extends State<ChatScreen> {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 3),
+        margin: const EdgeInsets.symmetric(vertical: 3.5),
         padding: EdgeInsets.all(hasMedia && !isDoc ? 4 : 10),
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.78,
         ),
         decoration: BoxDecoration(
-          color: isMe ? AppColors.myMessageBubble : AppColors.peerMessageBubble,
+          gradient: isMe ? AppColors.bubbleGradient : null,
+          color: isMe ? null : AppColors.peerMessageBubble,
+          border: isMe ? null : Border.all(color: AppColors.cardBorder),
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(14),
-            topRight: const Radius.circular(14),
-            bottomLeft: Radius.circular(isMe ? 14 : 0),
-            bottomRight: Radius.circular(isMe ? 0 : 14),
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMe ? 16 : 3),
+            bottomRight: Radius.circular(isMe ? 3 : 16),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -671,7 +738,7 @@ class _ChatScreenState extends State<ChatScreen> {
               _buildDocumentWidget(message),
             ] else if (hasMedia) ...[
               ClipRRect(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 child: isImage
                     ? GestureDetector(
                         onTap: () => _openFullScreenImage(message.mediaUrl!),
@@ -683,7 +750,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           placeholder: (context, url) => Container(
                             height: 200,
                             color: Colors.black12,
-                            child: const Center(child: CircularProgressIndicator(color: AppColors.primaryLight, strokeWidth: 2)),
+                            child: const Center(child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2)),
                           ),
                           errorWidget: (context, url, error) => Container(
                             height: 200,
@@ -701,11 +768,11 @@ class _ChatScreenState extends State<ChatScreen> {
                             children: [
                               CircleAvatar(
                                 radius: 28,
-                                backgroundColor: AppColors.primaryLight,
-                                child: Icon(Icons.play_arrow, color: Colors.white, size: 36),
+                                backgroundColor: AppColors.accent,
+                                child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 36),
                               ),
                               SizedBox(height: 8),
-                              Text('Video Mesajı', style: TextStyle(color: Colors.white, fontSize: 13)),
+                              Text('Video Mesajı', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
                             ],
                           ),
                         ),
@@ -716,16 +783,16 @@ class _ChatScreenState extends State<ChatScreen> {
                   padding: const EdgeInsets.fromLTRB(6, 6, 6, 2),
                   child: Text(
                     message.content,
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+                    style: const TextStyle(color: Colors.white, fontSize: 14.5),
                   ),
                 ),
             ] else ...[
               Text(
                 message.content,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 15,
-                  height: 1.3,
+                style: TextStyle(
+                  color: isMe ? Colors.white : AppColors.textPrimary,
+                  fontSize: 14.5,
+                  height: 1.35,
                 ),
               ),
             ],
@@ -737,17 +804,17 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   Text(
                     DateFormat('HH:mm').format(message.timestamp),
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
+                    style: TextStyle(
+                      color: isMe ? Colors.white70 : AppColors.textSecondary,
                       fontSize: 11,
                     ),
                   ),
                   if (isMe) ...[
                     const SizedBox(width: 4),
                     Icon(
-                      (message.isRead || message.isDelivered) ? Icons.done_all : Icons.done,
+                      (message.isRead || message.isDelivered) ? Icons.done_all_rounded : Icons.done_rounded,
                       size: 15,
-                      color: message.isRead ? AppColors.accent : AppColors.textSecondary,
+                      color: message.isRead ? AppColors.accent : Colors.white70,
                     ),
                   ],
                 ],
@@ -761,17 +828,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildMessageInput() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       color: AppColors.surface,
       child: SafeArea(
         child: Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.attach_file, color: AppColors.textSecondary),
+              icon: const Icon(Icons.attach_file_rounded, color: AppColors.textSecondary),
               onPressed: _showMediaPickerSheet,
             ),
             IconButton(
-              icon: const Icon(Icons.camera_alt, color: AppColors.primaryLight),
+              icon: const Icon(Icons.camera_alt_rounded, color: AppColors.primaryLight),
               onPressed: () => _pickAndSendMedia(source: ImageSource.camera, isVideo: false),
             ),
             Expanded(
@@ -780,13 +847,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.surfaceLight,
                   borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.cardBorder),
                 ),
                 child: TextField(
                   controller: _messageController,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 14.5),
                   decoration: const InputDecoration(
                     hintText: 'Mesaj yazın...',
-                    hintStyle: TextStyle(color: AppColors.textSecondary),
+                    hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                     border: InputBorder.none,
                   ),
                   maxLines: null,
@@ -795,13 +863,24 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 6),
-            CircleAvatar(
-              radius: 23,
-              backgroundColor: AppColors.primaryLight,
-              child: IconButton(
-                icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                onPressed: () => _sendMessage(),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => _sendMessage(),
+              child: Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.4),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
               ),
             ),
           ],

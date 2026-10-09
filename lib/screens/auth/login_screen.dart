@@ -61,46 +61,46 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   // Logo / Header Icon
                   Container(
-                    width: 90,
-                    height: 90,
+                    width: 86,
+                    height: 86,
                     decoration: BoxDecoration(
-                      color: AppColors.primaryDark,
+                      gradient: AppColors.primaryGradient,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primaryLight.withOpacity(0.3),
+                          color: AppColors.primaryLight.withOpacity(0.35),
                           blurRadius: 20,
                           spreadRadius: 2,
                         ),
                       ],
                     ),
                     child: const Icon(
-                      Icons.chat_rounded,
+                      Icons.shield_rounded,
                       color: Colors.white,
-                      size: 48,
+                      size: 44,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // App Title
                   const Text(
-                    'Chat & Call',
+                    'SafeChat',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 30,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
-                      letterSpacing: 1.1,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   const Text(
-                    'Hesabınıza giriş yapın',
+                    'Güvenli ve Hızlı Mesajlaşma',
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 14,
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 32),
 
                   // Username Input
                   TextFormField(

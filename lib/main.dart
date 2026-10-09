@@ -79,26 +79,38 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => CustomAuthService()),
       ],
-      child: const WhatsAppCloneApp(),
+      child: const SafeChatApp(),
     ),
   );
 }
 
-class WhatsAppCloneApp extends StatelessWidget {
-  const WhatsAppCloneApp({super.key});
+class SafeChatApp extends StatelessWidget {
+  const SafeChatApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'WhatsApp Clone',
+      title: 'SafeChat',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppColors.background,
         primaryColor: AppColors.primary,
+        textTheme: GoogleFonts.plusJakartaSansTextTheme(
+          ThemeData.dark().textTheme.apply(
+            bodyColor: AppColors.textPrimary,
+            displayColor: AppColors.textPrimary,
+          ),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: AppColors.surface,
+          elevation: 0,
+          centerTitle: false,
+          iconTheme: IconThemeData(color: AppColors.textPrimary),
+        ),
         colorScheme: const ColorScheme.dark(
-          primary: AppColors.primaryLight,
-          secondary: AppColors.primaryDark,
+          primary: AppColors.primary,
+          secondary: AppColors.accent,
           surface: AppColors.surface,
           background: AppColors.background,
         ),

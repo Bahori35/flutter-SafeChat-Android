@@ -460,35 +460,82 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
+        titleSpacing: 16,
         title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: const InputDecoration(
-                  hintText: 'Kullanıcı adı veya isim ara...',
-                  hintStyle: TextStyle(color: AppColors.textSecondary),
-                  border: InputBorder.none,
+            ? Container(
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(24),
                 ),
-                onChanged: (val) {
-                  setState(() {
-                    _searchQuery = val.trim();
-                  });
-                },
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                  decoration: const InputDecoration(
+                    hintText: 'Sohbet veya kişi ara...',
+                    hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                    border: InputBorder.none,
+                    icon: Icon(Icons.search, color: AppColors.primaryLight, size: 20),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val.trim();
+                    });
+                  },
+                ),
               )
-            : const Text(
-                'WhatsApp',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                ),
+            : Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.shield_outlined, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'SafeChat',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      Text(
+                        'Güvenli & Hızlı İletişim',
+                        style: TextStyle(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 10,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
         actions: [
           IconButton(
             icon: Icon(
               _isSearching ? Icons.close : Icons.search,
-              color: AppColors.textSecondary,
+              color: AppColors.textPrimary,
             ),
             onPressed: () {
               setState(() {
@@ -499,7 +546,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             },
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
+            icon: const Icon(Icons.sync_rounded, color: AppColors.textPrimary),
+            tooltip: 'Rehberi Eşitle',
             onPressed: () {
               setState(() {
                 _isLoadingUsers = true;
@@ -508,8 +556,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             },
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+            icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
             color: AppColors.surfaceLight,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             onSelected: (val) {
               if (val == 'profile') {
                 Navigator.push(
@@ -526,23 +575,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: Row(
                   children: [
                     CircleAvatar(
-                      radius: 12,
+                      radius: 14,
                       backgroundImage: CachedNetworkImageProvider(currentUser.photoUrl),
                     ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          currentUser.displayName,
-                          style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        Text(
-                          'Profili Düzenle',
-                          style: const TextStyle(color: AppColors.primaryLight, fontSize: 11),
-                        ),
-                      ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            currentUser.displayName,
+                            style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const Text(
+                            'Profili Düzenle',
+                            style: TextStyle(color: AppColors.primaryLight, fontSize: 11),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -551,11 +603,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 value: 'logout',
                 child: Row(
                   children: [
-                    Icon(Icons.logout, color: AppColors.callRed, size: 20),
-                    SizedBox(width: 10),
+                    Icon(Icons.logout_rounded, color: AppColors.callRed, size: 20),
+                    SizedBox(width: 12),
                     Text(
                       'Çıkış Yap',
-                      style: TextStyle(color: AppColors.callRed),
+                      style: TextStyle(color: AppColors.callRed, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -563,19 +615,43 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ],
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.primaryLight,
-          indicatorWeight: 3.5,
-          labelColor: AppColors.primaryLight,
-          unselectedLabelColor: AppColors.textSecondary,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          tabs: const [
-            Tab(text: 'SOHBETLER'),
-            Tab(text: 'DURUM'),
-            Tab(text: 'KİŞİLER'),
-            Tab(text: 'ARAMALAR'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceLight.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(25),
+              border: Border.all(color: AppColors.cardBorder),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelColor: Colors.white,
+              unselectedLabelColor: AppColors.textSecondary,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+              tabs: const [
+                Tab(text: 'Sohbet'),
+                Tab(text: 'Hikaye'),
+                Tab(text: 'Rehber'),
+                Tab(text: 'Aramalar'),
+              ],
+            ),
+          ),
         ),
       ),
       body: TabBarView(
@@ -594,11 +670,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget? _buildFab(UserModel currentUser) {
     if (_tabController.index == 0) {
       return FloatingActionButton(
-        backgroundColor: AppColors.primaryLight,
+        backgroundColor: Colors.transparent,
+        elevation: 4,
         onPressed: () {
           _tabController.animateTo(2); // Go to contacts
         },
-        child: const Icon(Icons.message, color: Colors.white),
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: AppColors.primaryGradient,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.4),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.chat_rounded, color: Colors.white),
+        ),
       );
     } else if (_tabController.index == 1) {
       return Column(
@@ -607,13 +699,29 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           FloatingActionButton.small(
             backgroundColor: AppColors.surfaceLight,
             onPressed: () => _navigateToAddStory(currentUser),
-            child: const Icon(Icons.edit, color: Colors.white),
+            child: const Icon(Icons.edit_rounded, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 12),
           FloatingActionButton(
-            backgroundColor: AppColors.primaryLight,
+            backgroundColor: Colors.transparent,
+            elevation: 4,
             onPressed: () => _navigateToAddStory(currentUser),
-            child: const Icon(Icons.camera_alt, color: Colors.white),
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.camera_alt_rounded, color: Colors.white),
+            ),
           ),
         ],
       );
@@ -740,38 +848,58 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
 
           if (recentUpdates.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                'Son Güncellemeler',
-                style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 13),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.auto_awesome, color: AppColors.accent, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Son Güncellemeler (${recentUpdates.length})',
+                    style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ],
               ),
             ),
             ...recentUpdates.map((group) {
               final idx = _storyGroups.indexOf(group);
-              return ListTile(
-                onTap: () => _openStoryViewer(idx, currentUser),
-                leading: Container(
-                  padding: const EdgeInsets.all(2.5),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primaryLight, width: 2.5),
-                  ),
-                  child: CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppColors.surfaceLight,
-                    backgroundImage: group.userPhotoUrl.isNotEmpty
-                        ? CachedNetworkImageProvider(group.userPhotoUrl)
-                        : null,
-                    child: group.userPhotoUrl.isEmpty
-                        ? const Icon(Icons.person, color: AppColors.textSecondary)
-                        : null,
-                  ),
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.cardBorder),
                 ),
-                title: Text(group.displayName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
-                subtitle: Text(
-                  '${group.stories.length} yeni güncelleme',
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  onTap: () => _openStoryViewer(idx, currentUser),
+                  leading: Container(
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: AppColors.storyRingGradient,
+                    ),
+                    child: CircleAvatar(
+                      radius: 23,
+                      backgroundColor: AppColors.surfaceLight,
+                      backgroundImage: group.userPhotoUrl.isNotEmpty
+                          ? CachedNetworkImageProvider(group.userPhotoUrl)
+                          : null,
+                      child: group.userPhotoUrl.isEmpty
+                          ? const Icon(Icons.person, color: AppColors.textSecondary)
+                          : null,
+                    ),
+                  ),
+                  title: Text(
+                    group.displayName,
+                    style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 15),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    '${group.stories.length} yeni hikaye',
+                    style: const TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 20),
                 ),
               );
             }),
@@ -779,7 +907,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
           if (viewedUpdates.isNotEmpty) ...[
             const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: EdgeInsets.fromLTRB(18, 16, 18, 8),
               child: Text(
                 'Görülen Güncellemeler',
                 style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 13),
@@ -787,47 +915,70 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
             ...viewedUpdates.map((group) {
               final idx = _storyGroups.indexOf(group);
-              return ListTile(
-                onTap: () => _openStoryViewer(idx, currentUser),
-                leading: Container(
-                  padding: const EdgeInsets.all(2.5),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.surfaceLight, width: 2.5),
-                  ),
-                  child: CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppColors.surfaceLight,
-                    backgroundImage: group.userPhotoUrl.isNotEmpty
-                        ? CachedNetworkImageProvider(group.userPhotoUrl)
-                        : null,
-                    child: group.userPhotoUrl.isEmpty
-                        ? const Icon(Icons.person, color: AppColors.textSecondary)
-                        : null,
-                  ),
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surface.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.cardBorder),
                 ),
-                title: Text(group.displayName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
-                subtitle: const Text('Görüldü', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  onTap: () => _openStoryViewer(idx, currentUser),
+                  leading: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.textMuted, width: 2),
+                    ),
+                    child: CircleAvatar(
+                      radius: 23,
+                      backgroundColor: AppColors.surfaceLight,
+                      backgroundImage: group.userPhotoUrl.isNotEmpty
+                          ? CachedNetworkImageProvider(group.userPhotoUrl)
+                          : null,
+                      child: group.userPhotoUrl.isEmpty
+                          ? const Icon(Icons.person, color: AppColors.textSecondary)
+                          : null,
+                    ),
+                  ),
+                  title: Text(
+                    group.displayName,
+                    style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 15),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: const Text('Görüldü', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 20),
+                ),
               );
             }),
           ],
 
           if (recentUpdates.isEmpty && viewedUpdates.isEmpty && (myStoryGroup == null || myStoryGroup.stories.isEmpty)) ...[
             const SizedBox(height: 60),
-            const Center(
+            Center(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 32),
+                padding: const EdgeInsets.symmetric(horizontal: 32),
                 child: Column(
                   children: [
-                    Icon(Icons.history_toggle_off_rounded, size: 64, color: AppColors.textMuted),
-                    SizedBox(height: 12),
-                    Text(
-                      'Henüz hiçbir durum paylaşılmadı.',
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: const Icon(Icons.history_toggle_off_rounded, size: 40, color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Henüz Hikaye Paylaşılmadı',
                       style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
                     ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Yukarıdaki butona veya kameraya basarak ilk durumunuzu paylaşın!',
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Kişilerinizle anlarınızı paylaşmak için yukarıdaki karttan ilk hikayenizi ekleyin!',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
                     ),
@@ -847,7 +998,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       return const Center(child: CircularProgressIndicator(color: AppColors.primaryLight));
     }
 
-    // Only show contacts from user's phonebook
     var filteredUsers = _phoneContacts;
     if (_searchQuery.isNotEmpty) {
       filteredUsers = filteredUsers
@@ -858,7 +1008,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           .toList();
     }
 
-    // Story groups filtered only to phone contacts + myself
     final allowedStoryGroups = _storyGroups.where((g) {
       return g.userId.toString() == currentUser.uid ||
           _phoneContacts.any((c) => c.uid == g.userId.toString());
@@ -882,17 +1031,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     return Column(
       children: [
-        // Top Horizontal Story Avatar Bar (Instagram / Modern WhatsApp Style)
+        // Top Horizontal Active Story Bar
         if (allowedStoryGroups.isNotEmpty)
           Container(
-            height: 96,
+            height: 100,
             padding: const EdgeInsets.symmetric(vertical: 8),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.surface, width: 1)),
+              border: Border(bottom: BorderSide(color: AppColors.cardBorder, width: 1)),
             ),
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               children: [
                 // My Story Bubble
                 GestureDetector(
@@ -916,8 +1065,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               padding: const EdgeInsets.all(2.5),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: allowedStoryGroups.any((g) => g.userId.toString() == currentUser.uid)
-                                    ? Border.all(color: AppColors.primaryLight, width: 2.5)
+                                gradient: allowedStoryGroups.any((g) => g.userId.toString() == currentUser.uid)
+                                    ? AppColors.storyRingGradient
                                     : null,
                               ),
                               child: CircleAvatar(
@@ -937,16 +1086,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                 right: 0,
                                 child: Container(
                                   padding: const EdgeInsets.all(2),
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.primaryLight,
+                                  decoration: BoxDecoration(
+                                    gradient: AppColors.primaryGradient,
                                     shape: BoxShape.circle,
+                                    border: Border.all(color: AppColors.background, width: 2),
                                   ),
                                   child: const Icon(Icons.add, color: Colors.white, size: 14),
                                 ),
                               ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 5),
                         const Text(
                           'Hikayen',
                           style: TextStyle(color: AppColors.textPrimary, fontSize: 11, fontWeight: FontWeight.w600),
@@ -956,7 +1106,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                 ),
 
-                // Other Users Stories (Only Rehberdeki Kişiler)
+                // Other Users Stories
                 ...allowedStoryGroups.where((g) => g.userId.toString() != currentUser.uid).map((group) {
                   final groupIdx = allowedStoryGroups.indexOf(group);
                   return GestureDetector(
@@ -970,10 +1120,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             padding: const EdgeInsets.all(2.5),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(
-                                color: group.allViewed ? AppColors.surfaceLight : AppColors.primaryLight,
-                                width: 2.5,
-                              ),
+                              gradient: group.allViewed ? null : AppColors.storyRingGradient,
+                              border: group.allViewed ? Border.all(color: AppColors.textMuted, width: 2) : null,
                             ),
                             child: CircleAvatar(
                               radius: 25,
@@ -986,15 +1134,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   : null,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 5),
                           SizedBox(
-                            width: 62,
+                            width: 64,
                             child: Text(
                               group.displayName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: AppColors.textPrimary, fontSize: 11),
+                              style: const TextStyle(color: AppColors.textPrimary, fontSize: 11, fontWeight: FontWeight.w500),
                             ),
                           ),
                         ],
@@ -1006,7 +1154,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ),
 
-        // Chat List (Only Phone Contacts)
+        // Chat List Cards
         Expanded(
           child: filteredUsers.isEmpty
               ? Center(
@@ -1015,98 +1163,134 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.contact_phone_outlined, size: 60, color: AppColors.textMuted),
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.cardBorder),
+                          ),
+                          child: const Icon(Icons.chat_bubble_outline_rounded, size: 40, color: AppColors.textMuted),
+                        ),
                         const SizedBox(height: 16),
                         const Text(
-                          'Rehberinizden Henüz Kimse Bulunamadı',
+                          'Sohbet Bulunamadı',
                           style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Sadece telefon rehberinizde kayıtlı olan ve uygulamayı kullanan kişiler burada görünür.',
+                          'Rehberinizdeki kayıtlı kişilerle anında güvenli sohbet başlatabilirsiniz.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryLight,
+                            backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                           onPressed: () => _syncDeviceContacts(silent: false),
-                          icon: const Icon(Icons.sync),
+                          icon: const Icon(Icons.sync_rounded),
                           label: const Text('Rehberi Yenile'),
                         ),
                       ],
                     ),
                   ),
                 )
-              : ListView.separated(
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: filteredUsers.length,
-                  separatorBuilder: (ctx, i) => const Divider(color: AppColors.surface, height: 1, indent: 76),
                   itemBuilder: (context, index) {
                     final user = filteredUsers[index];
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      leading: Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 26,
-                            backgroundColor: AppColors.surfaceLight,
-                            backgroundImage: CachedNetworkImageProvider(user.photoUrl),
-                          ),
-                          if (user.isOnline)
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                width: 14,
-                                height: 14,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryLight,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: AppColors.background, width: 2),
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        leading: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 26,
+                              backgroundColor: AppColors.surfaceLight,
+                              backgroundImage: CachedNetworkImageProvider(user.photoUrl),
+                            ),
+                            if (user.isOnline)
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.onlineGreen,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppColors.surface, width: 2),
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
-                      ),
-                      title: Text(
-                        user.displayName,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          ],
                         ),
-                      ),
-                      subtitle: Text(
-                        user.status,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.call, color: AppColors.primaryLight, size: 22),
-                            onPressed: () => _startAudioOrVideoCall(user, CallType.audio),
+                        title: Text(
+                          user.displayName,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.videocam, color: AppColors.primaryLight, size: 24),
-                            onPressed: () => _startAudioOrVideoCall(user, CallType.video),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 2.0),
+                          child: Text(
+                            user.status,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                           ),
-                        ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.call_rounded, color: AppColors.primaryLight, size: 18),
+                              ),
+                              onPressed: () => _startAudioOrVideoCall(user, CallType.audio),
+                            ),
+                            IconButton(
+                              icon: Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent.withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.videocam_rounded, color: AppColors.accent, size: 18),
+                              ),
+                              onPressed: () => _startAudioOrVideoCall(user, CallType.video),
+                            ),
+                          ],
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(peerUser: user, currentUser: currentUser),
+                            ),
+                          );
+                        },
                       ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatScreen(peerUser: user, currentUser: currentUser),
-                          ),
-                        );
-                      },
                     );
                   },
                 ),
@@ -1115,7 +1299,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // Users / Contacts Tab - ONLY Phone Contacts with Local Names
+  // Users / Contacts Tab
   Widget _buildUsersTab(UserModel currentUser) {
     if (_isLoadingUsers) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primaryLight));
@@ -1138,93 +1322,142 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         await _syncDeviceContacts(silent: false);
       },
       child: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          // Header: Sync Contacts Action Tile
-          ListTile(
-            onTap: _isSyncingContacts ? null : () => _syncDeviceContacts(silent: false),
-            leading: CircleAvatar(
-              radius: 22,
-              backgroundColor: AppColors.surfaceLight,
-              child: _isSyncingContacts
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(color: AppColors.primaryLight, strokeWidth: 2),
-                    )
-                  : const Icon(Icons.contacts, color: AppColors.primaryLight),
+          // Header Sync Tile
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primary.withOpacity(0.15), AppColors.accent.withOpacity(0.08)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
             ),
-            title: const Text('Rehberi Yenile / Eşitle', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 15)),
-            subtitle: Text(
-              _phoneContacts.isNotEmpty
-                  ? 'Rehberinizden ${_phoneContacts.length} kişi bu uygulamayı kullanıyor'
-                  : 'Rehberinizdeki kişileri otomatik eşleştirin',
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              onTap: _isSyncingContacts ? null : () => _syncDeviceContacts(silent: false),
+              leading: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: _isSyncingContacts
+                    ? const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        ),
+                      )
+                    : const Icon(Icons.sync_rounded, color: Colors.white, size: 24),
+              ),
+              title: const Text(
+                'Rehberi Yenile & Eşitle',
+                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              subtitle: Text(
+                _phoneContacts.isNotEmpty
+                    ? '${_phoneContacts.length} kişi SafeChat kullanıyor'
+                    : 'Rehberinizdeki kişileri otomatik bulun',
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.primaryLight, size: 16),
             ),
-            trailing: const Icon(Icons.sync, color: AppColors.primaryLight),
           ),
-          const Divider(color: AppColors.surface),
 
-          // Section: Phone Contacts using the app
           if (filteredPhoneContacts.isNotEmpty) ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
               child: Text(
                 'Rehberinizdeki Kişiler (${filteredPhoneContacts.length})',
-                style: const TextStyle(color: AppColors.primaryLight, fontWeight: FontWeight.bold, fontSize: 13),
+                style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ),
             ...filteredPhoneContacts.map((user) {
-              return ListTile(
-                leading: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: AppColors.surfaceLight,
-                      backgroundImage: CachedNetworkImageProvider(user.photoUrl),
-                    ),
-                    if (user.isOnline)
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryLight,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.background, width: 2),
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  leading: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: AppColors.surfaceLight,
+                        backgroundImage: CachedNetworkImageProvider(user.photoUrl),
+                      ),
+                      if (user.isOnline)
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: AppColors.onlineGreen,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.surface, width: 2),
+                            ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                title: Text(user.displayName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
-                subtitle: Text(
-                  '${user.phoneNumber.isNotEmpty ? user.phoneNumber : "@${user.username}"} • ${user.isOnline ? "Çevrimiçi" : "Çevrimdışı"}',
-                  style: TextStyle(
-                    color: user.isOnline ? AppColors.primaryLight : AppColors.textSecondary,
-                    fontSize: 13,
+                    ],
                   ),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.call, color: AppColors.primaryLight, size: 22),
-                      onPressed: () => _startAudioOrVideoCall(user, CallType.audio),
+                  title: Text(
+                    user.displayName,
+                    style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700, fontSize: 15),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    user.isOnline ? "Çevrimiçi" : "Çevrimdışı",
+                    style: TextStyle(
+                      color: user.isOnline ? AppColors.onlineGreen : AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.chat, color: AppColors.primaryLight, size: 22),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatScreen(peerUser: user, currentUser: currentUser),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.12),
+                            shape: BoxShape.circle,
                           ),
-                        );
-                      },
-                    ),
-                  ],
+                          child: const Icon(Icons.call_rounded, color: AppColors.primaryLight, size: 18),
+                        ),
+                        onPressed: () => _startAudioOrVideoCall(user, CallType.audio),
+                      ),
+                      IconButton(
+                        icon: Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent.withOpacity(0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.chat_bubble_rounded, color: AppColors.accent, size: 18),
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(peerUser: user, currentUser: currentUser),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               );
             }),
@@ -1235,28 +1468,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
                   children: [
-                    const Icon(Icons.perm_contact_calendar_outlined, size: 64, color: AppColors.textMuted),
-                    const SizedBox(height: 12),
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: const Icon(Icons.perm_contact_calendar_outlined, size: 40, color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 16),
                     const Text(
-                      'Rehberinizde kayıtlı kullanıcı bulunamadı',
+                      'Kayıtlı Kişi Bulunamadı',
                       style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Yalnızca telefon rehberinizde kayıtlı olup bu uygulamaya kayıt olmuş kişiler burada listelenir.',
+                      'Rehberinizdeki kişilerin SafeChat hesabı olduğunda burada otomatik olarak görünecektir.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryLight,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () => _syncDeviceContacts(silent: false),
-                      icon: const Icon(Icons.sync),
-                      label: const Text('Rehberi Yeniden Eşitle'),
                     ),
                   ],
                 ),
@@ -1286,16 +1517,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.phone_missed_rounded, size: 70, color: AppColors.textMuted),
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: const Icon(Icons.phone_missed_rounded, size: 40, color: AppColors.textMuted),
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'Henüz Arama Kaydı Yok',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 17, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Kişilerinizle yaptığınız tüm sesli ve görüntülü konuşmalar\nve konuşma süreleri burada listelenir.',
+                      'Kişilerinizle yaptığınız tüm sesli ve görüntülü görüşmeler burada güvenle listelenir.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
                     ),
@@ -1303,9 +1543,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               ),
             )
-          : ListView.separated(
+          : ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: _callLogs.length,
-              separatorBuilder: (ctx, i) => const Divider(color: AppColors.surface, height: 1, indent: 76),
               itemBuilder: (context, index) {
                 final log = _callLogs[index];
                 final isOutgoing = log.callerId == currentUser.uid;
@@ -1314,7 +1554,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 String otherUserName = isOutgoing ? log.receiverName : log.callerName;
                 String otherUserPic = isOutgoing ? log.receiverPic : log.callerPic;
 
-                // Priority: match with user's local phonebook name if available
                 try {
                   final matched = _phoneContacts.firstWhere((c) => c.uid == otherUserId);
                   otherUserName = matched.displayName;
@@ -1352,68 +1591,90 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   }
                   
                   const turkishMonths = [
-                    '', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-                    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+                    '', 'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
+                    'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'
                   ];
                   final monthName = (dt.month >= 1 && dt.month <= 12) ? turkishMonths[dt.month] : '';
                   return '${dt.day} $monthName, $timeStr';
                 }
 
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  leading: CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppColors.surfaceLight,
-                    backgroundImage: otherUserPic.isNotEmpty ? CachedNetworkImageProvider(otherUserPic) : null,
-                    child: otherUserPic.isEmpty ? const Icon(Icons.person, color: AppColors.textSecondary) : null,
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.cardBorder),
                   ),
-                  title: Text(
-                    otherUserName,
-                    style: TextStyle(
-                      color: isMissed ? AppColors.callRed : AppColors.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    leading: CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppColors.surfaceLight,
+                      backgroundImage: otherUserPic.isNotEmpty ? CachedNetworkImageProvider(otherUserPic) : null,
+                      child: otherUserPic.isEmpty ? const Icon(Icons.person, color: AppColors.textSecondary) : null,
                     ),
-                  ),
-                  subtitle: Row(
-                    children: [
-                      Icon(callDirectionIcon, color: callDirectionColor, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatCallTime(log.timestamp),
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    title: Text(
+                      otherUserName,
+                      style: TextStyle(
+                        color: isMissed ? AppColors.callRed : AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
                       ),
-                      if (log.durationSeconds > 0) ...[
-                        const Text(' • ', style: TextStyle(color: AppColors.textSecondary)),
-                        Text(
-                          log.formattedDuration,
-                          style: const TextStyle(color: AppColors.primaryLight, fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
-                      ] else if (isMissed) ...[
-                        const Text(' • ', style: TextStyle(color: AppColors.textSecondary)),
-                        const Text(
-                          'Cevapsız',
-                          style: TextStyle(color: AppColors.callRed, fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ],
-                  ),
-                  trailing: IconButton(
-                    icon: Icon(
-                      isVideo ? Icons.videocam : Icons.call,
-                      color: AppColors.primaryLight,
-                      size: 24,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    onPressed: () {
-                      final targetUser = UserModel(
-                        uid: otherUserId,
-                        username: otherUserName,
-                        email: '',
-                        displayName: otherUserName,
-                        photoUrl: otherUserPic,
-                      );
-                      _startAudioOrVideoCall(targetUser, log.callType);
-                    },
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 3.0),
+                      child: Row(
+                        children: [
+                          Icon(callDirectionIcon, color: callDirectionColor, size: 15),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              _formatCallTime(log.timestamp),
+                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (log.durationSeconds > 0) ...[
+                            const Text(' • ', style: TextStyle(color: AppColors.textSecondary)),
+                            Text(
+                              log.formattedDuration,
+                              style: const TextStyle(color: AppColors.primaryLight, fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ] else if (isMissed) ...[
+                            const Text(' • ', style: TextStyle(color: AppColors.textSecondary)),
+                            const Text(
+                              'Cevapsız',
+                              style: TextStyle(color: AppColors.callRed, fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    trailing: IconButton(
+                      icon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: (isVideo ? AppColors.accent : AppColors.primary).withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isVideo ? Icons.videocam_rounded : Icons.call_rounded,
+                          color: isVideo ? AppColors.accent : AppColors.primaryLight,
+                          size: 20,
+                        ),
+                      ),
+                      onPressed: () {
+                        final targetUser = UserModel(
+                          uid: otherUserId,
+                          username: otherUserName,
+                          email: '',
+                          displayName: otherUserName,
+                          photoUrl: otherUserPic,
+                        );
+                        _startAudioOrVideoCall(targetUser, log.callType);
+                      },
+                    ),
                   ),
                 );
               },
