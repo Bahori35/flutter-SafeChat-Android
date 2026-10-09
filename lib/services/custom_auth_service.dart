@@ -257,12 +257,17 @@ class CustomAuthService extends ChangeNotifier {
     }
   }
 
-  // Upload image to server and get public URL
+  // Upload image or file to server and get public URL
   Future<String?> uploadImage(String filePath) async {
+    return uploadFile(filePath);
+  }
+
+  // Upload any file/document to server
+  Future<String?> uploadFile(String filePath) async {
     try {
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/upload'));
       request.files.add(await http.MultipartFile.fromPath('file', filePath));
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 15));
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
@@ -270,7 +275,7 @@ class CustomAuthService extends ChangeNotifier {
         return data['url'];
       }
     } catch (e) {
-      debugPrint('[UPLOAD] Error uploading image: $e');
+      debugPrint('[UPLOAD] Error uploading file: $e');
     }
     return null;
   }

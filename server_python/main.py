@@ -154,6 +154,16 @@ def init_db():
             except Exception:
                 pass
 
+            try:
+                cursor.execute("ALTER TABLE messages MODIFY COLUMN message_type VARCHAR(50) DEFAULT 'text';")
+            except Exception:
+                pass
+
+            try:
+                cursor.execute("ALTER TABLE messages MODIFY COLUMN media_url TEXT NULL;")
+            except Exception:
+                pass
+
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS call_logs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -672,9 +682,11 @@ async def send_message(sid, data):
         
         push_body = content
         if msg_type == "image":
-            push_body = "📷 Fotoğraf" + (f": {content}" if content else "")
+            push_body = "📷 Fotoğraf" + (f": {content}" if content and content != '📷 Fotoğraf' else "")
         elif msg_type == "video":
-            push_body = "🎥 Video" + (f": {content}" if content else "")
+            push_body = "🎥 Video" + (f": {content}" if content and content != '🎥 Video' else "")
+        elif msg_type == "doc":
+            push_body = f"📄 {content}" if content else "📄 Dosya"
 
         send_fcm_push(
             user_id=target_uid,
