@@ -10,6 +10,6 @@ echo.
 echo [Sunucu baslatiliyor -> http://localhost:3000]
 echo.
 
-"C:\Program Files\PyManager\python.exe" main.py
+python main.py
 
 pause

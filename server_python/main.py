@@ -25,18 +25,20 @@ SECRET_KEY = os.getenv("JWT_SECRET", "super_secret_jwt_key_safechat_2026")
 # --- FIREBASE ADMIN INITIALIZATION ---
 firebase_initialized = False
 try:
-    key_path = os.path.join(os.path.dirname(__file__), "safechet-bildirim-firebase-adminsdk-fbsvc-9989ea95a3.json")
-    if not firebase_admin._apps:
-        if os.path.exists(key_path):
+    current_dir = os.path.dirname(__file__)
+    key_files = [f for f in os.listdir(current_dir) if f.startswith("safechet-bildirim-firebase-adminsdk") and f.endswith(".json")]
+    if key_files:
+        key_path = os.path.join(current_dir, key_files[0])
+        if not firebase_admin._apps:
             cred = credentials.Certificate(key_path)
             firebase_admin.initialize_app(cred)
             firebase_initialized = True
-            print("[OK] Firebase Admin SDK basariyla yuklendi!")
+            print(f"[OK] Firebase Admin SDK yuklendi: {key_files[0]}")
         else:
-            print(f"[UYARI] Firebase key dosyasi bulunamadi: {key_path}")
+            firebase_initialized = True
+            print("[OK] Firebase Admin SDK zaten calisiyor!")
     else:
-        firebase_initialized = True
-        print("[OK] Firebase Admin SDK zaten calisiyor!")
+        print(f"[UYARI] Firebase key dosyasi bulunamadi (safechet-bildirim-firebase-adminsdk-*.json)")
 except Exception as e:
     print(f"[HATA] Firebase Admin baslatilamadi: {e}")
 
