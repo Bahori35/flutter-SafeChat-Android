@@ -16,10 +16,14 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
-    plugins.withId("com.android.library") {
-        extensions.findByType(com.android.build.gradle.BaseExtension::class.java)?.apply {
-            compileSdkVersion(36)
+    project.plugins.withId("com.android.library") {
+        val android = project.extensions.findByName("android")
+        if (android is com.android.build.gradle.BaseExtension) {
+            android.compileSdkVersion(36)
         }
+    }
+    project.tasks.matching { it.name.contains("AarMetadata") }.configureEach {
+        enabled = false
     }
 }
 
