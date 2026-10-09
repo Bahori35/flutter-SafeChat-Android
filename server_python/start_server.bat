@@ -1,10 +1,10 @@
 @echo off
-title SafeChat Server
+title Talknex Server
 
 cd /d "%~dp0"
 
 echo ========================================================
-echo    SafeChat Python + MariaDB Server
+echo    Talknex Python + MariaDB Server
 echo ========================================================
 echo.
 echo [Sunucu baslatiliyor -> http://localhost:3000]

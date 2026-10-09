@@ -1,7 +1,7 @@
 {
   "name": "chat-call-server",
   "version": "1.0.0",
-  "description": "Custom Node.js + MariaDB + Socket.io + WebRTC Signaling Server for SafeChat",
+  "description": "Custom Node.js + MariaDB + Socket.io + WebRTC Signaling Server for Talknex",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -1,6 +1,6 @@
 {
-    "name": "SafeChat",
-    "short_name": "SafeChat",
+    "name": "Talknex",
+    "short_name": "Talknex",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

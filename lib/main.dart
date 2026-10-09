@@ -79,18 +79,18 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => CustomAuthService()),
       ],
-      child: const SafeChatApp(),
+      child: const TalknexApp(),
     ),
   );
 }
 
-class SafeChatApp extends StatelessWidget {
-  const SafeChatApp({super.key});
+class TalknexApp extends StatelessWidget {
+  const TalknexApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SafeChat',
+      title: 'Talknex',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,

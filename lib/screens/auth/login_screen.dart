@@ -93,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // App Title
                   const Text(
-                    'SafeChat',
+                    'Talknex',
                     style: TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.bold,

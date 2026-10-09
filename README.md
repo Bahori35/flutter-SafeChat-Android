@@ -1,4 +1,4 @@
-# SafeChat - Görüntülü, Sesli ve Mesajlaşma Mobil Uygulaması (Flutter & MariaDB/Python)
+# Talknex - Görüntülü, Sesli ve Mesajlaşma Mobil Uygulaması (Flutter & MariaDB/Python)
 
 Bu proje, Flutter (Dart) ve özel Python/MariaDB altyapısı üzerine inşa edilmiş, kullanıcı adı & şifre ile kayıt/giriş yapılan, birebir anlık mesajlaşma ile WebRTC destekli sesli ve görüntülü arama özelliklerine sahip tam teşekküllü ve güvenli bir mobil uygulamadır.
 
@@ -14,7 +14,7 @@ Bu proje, Flutter (Dart) ve özel Python/MariaDB altyapısı üzerine inşa edil
 2. **Gerçek Zamanlı Birebir Mesajlaşma:**
    - Anlık mesaj iletimi ([`chat_service.dart`](file:///c:/Users/BGame/Desktop/Konuşma%20Ve%20mesajlaşma%20Uygulaması/lib/services/chat_service.dart)).
    - Okundu bilgisi (Tek tık / Çift tık `done_all`).
-   - SafeChat neo-dark degradeli sohbet balonları ve tasarımı ([`chat_screen.dart`](file:///c:/Users/BGame/Desktop/Konuşma%20Ve%20mesajlaşma%20Uygulaması/lib/screens/chat/chat_screen.dart)).
+   - Talknex neo-dark degradeli sohbet balonları ve tasarımı ([`chat_screen.dart`](file:///c:/Users/BGame/Desktop/Konuşma%20Ve%20mesajlaşma%20Uygulaması/lib/screens/chat/chat_screen.dart)).
 
 3. **HD Görüntülü ve Sesli Konuşma (WebRTC):**
    - WebRTC sinyalleşmesi (SDP Offer / Answer ve ICE Candidates) ([`signaling_service.dart`](file:///c:/Users/BGame/Desktop/Konuşma%20Ve%20mesajlaşma%20Uygulaması/lib/services/signaling_service.dart)).
@@ -29,7 +29,7 @@ Bu proje, Flutter (Dart) ve özel Python/MariaDB altyapısı üzerine inşa edil
 ```
 lib/
 ├── constants/
-│   └── app_colors.dart         # SafeChat renk paleti ve tema sabitleri
+│   └── app_colors.dart         # Talknex renk paleti ve tema sabitleri
 ├── models/
 │   ├── user_model.dart         # Kullanıcı veri modeli
 │   ├── message_model.dart      # Mesaj veri modeli

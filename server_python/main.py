@@ -20,7 +20,7 @@ DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "chat_app_db")
 DB_PORT = int(os.getenv("DB_PORT", 3306))
-SECRET_KEY = os.getenv("JWT_SECRET", "super_secret_jwt_key_safechat_2026")
+SECRET_KEY = os.getenv("JWT_SECRET", "super_secret_jwt_key_talknex_2026")
 
 # --- FIREBASE ADMIN INITIALIZATION ---
 firebase_initialized = False

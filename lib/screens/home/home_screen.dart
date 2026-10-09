@@ -524,7 +524,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'SafeChat',
+                        'Talknex',
                         style: TextStyle(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.w800,
@@ -1376,7 +1376,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
               subtitle: Text(
                 _phoneContacts.isNotEmpty
-                    ? '${_phoneContacts.length} kişi SafeChat kullanıyor'
+                    ? '${_phoneContacts.length} kişi Talknex kullanıyor'
                     : 'Rehberinizdeki kişileri otomatik bulun',
                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
               ),
@@ -1499,7 +1499,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Rehberinizdeki kişilerin SafeChat hesabı olduğunda burada otomatik olarak görünecektir.',
+                      'Rehberinizdeki kişilerin Talknex hesabı olduğunda burada otomatik olarak görünecektir.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
                     ),

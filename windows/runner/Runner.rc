@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "SafeChat" "\0"
+            VALUE "FileDescription", "Talknex" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "SafeChat" "\0"
+            VALUE "InternalName", "Talknex" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "safechat.exe" "\0"
-            VALUE "ProductName", "SafeChat" "\0"
+            VALUE "OriginalFilename", "talknex.exe" "\0"
+            VALUE "ProductName", "Talknex" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
