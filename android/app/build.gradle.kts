@@ -7,7 +7,7 @@ plugins {
 
 
 android {
-    namespace = "com.example.flutter_whatsapp_clone"
+    namespace = "com.safechat.app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -19,7 +19,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.flutter_whatsapp_clone"
+        applicationId = "com.safechat.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 24
