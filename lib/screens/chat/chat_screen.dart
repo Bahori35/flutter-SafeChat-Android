@@ -324,10 +324,62 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // Open WhatsApp-like interactive Location Picker Map Screen
   Future<void> _openLocationPicker() async {
+    // Show a quick loading state while acquiring GPS
+    setState(() {
+      _isUploadingMedia = true;
+    });
+
+    LatLng? initialPos;
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (serviceEnabled) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+
+        if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+          // First try last known position for instant zero-delay coordinate
+          final lastKnown = await Geolocator.getLastKnownPosition();
+          if (lastKnown != null) {
+            initialPos = LatLng(lastKnown.latitude, lastKnown.longitude);
+          }
+
+          // Then get high accuracy current position
+          final current = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+            timeLimit: const Duration(seconds: 4),
+          ).catchError((_) => lastKnown ?? Position(
+            longitude: 28.9784,
+            latitude: 41.0082,
+            timestamp: DateTime.now(),
+            accuracy: 0,
+            altitude: 0,
+            altitudeAccuracy: 0,
+            heading: 0,
+            headingAccuracy: 0,
+            speed: 0,
+            speedAccuracy: 0,
+          ));
+          initialPos = LatLng(current.latitude, current.longitude);
+        }
+      }
+    } catch (e) {
+      debugPrint('[PRE-GPS ERROR] $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingMedia = false;
+        });
+      }
+    }
+
+    if (!mounted) return;
+
     final result = await Navigator.push<LocationPickerResult>(
       context,
       MaterialPageRoute(
-        builder: (_) => const LocationPickerScreen(),
+        builder: (_) => LocationPickerScreen(initialLocation: initialPos),
       ),
     );
 

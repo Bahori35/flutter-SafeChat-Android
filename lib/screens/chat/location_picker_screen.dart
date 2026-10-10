@@ -23,7 +23,9 @@ class LocationPickerResult {
 }
 
 class LocationPickerScreen extends StatefulWidget {
-  const LocationPickerScreen({super.key});
+  final LatLng? initialLocation;
+
+  const LocationPickerScreen({super.key, this.initialLocation});
 
   @override
   State<LocationPickerScreen> createState() => _LocationPickerScreenState();
@@ -31,18 +33,26 @@ class LocationPickerScreen extends StatefulWidget {
 
 class _LocationPickerScreenState extends State<LocationPickerScreen> {
   final MapController _mapController = MapController();
-  LatLng _currentLocation = const LatLng(41.0082, 28.9784); // Default Istanbul
-  LatLng _selectedLocation = const LatLng(41.0082, 28.9784);
+  late LatLng _currentLocation;
+  late LatLng _selectedLocation;
   bool _isLoadingGps = true;
   bool _isSearchingAddress = false;
-  String _selectedAddress = 'Seçilen konum yükleniyor...';
-  String _selectedTitle = 'Seçilen Konum';
-  List<Map<String, dynamic>> _nearbyPlaces = [];
+  String _selectedAddress = 'Konum alınıyor...';
+  String _selectedTitle = 'Konumunuz';
 
   @override
   void initState() {
     super.initState();
-    _getCurrentGpsLocation();
+    if (widget.initialLocation != null) {
+      _currentLocation = widget.initialLocation!;
+      _selectedLocation = widget.initialLocation!;
+      _isLoadingGps = false;
+      _reverseGeocode(widget.initialLocation!);
+    } else {
+      _currentLocation = const LatLng(39.925533, 32.866287);
+      _selectedLocation = _currentLocation;
+      _getCurrentGpsLocation();
+    }
   }
 
   Future<void> _getCurrentGpsLocation() async {
