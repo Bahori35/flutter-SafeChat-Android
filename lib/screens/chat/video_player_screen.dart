@@ -1,6 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import '../../constants/app_colors.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
@@ -31,8 +35,37 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   Future<void> _initializePlayer() async {
     try {
-      final uri = Uri.parse(widget.videoUrl);
-      _videoPlayerController = VideoPlayerController.networkUrl(uri);
+      final url = widget.videoUrl;
+      File? localVideoFile;
+
+      // 1. Check if user already has the local file path saved
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final savedPath = prefs.getString('vfile_${url.hashCode}');
+        if (savedPath != null && File(savedPath).existsSync()) {
+          localVideoFile = File(savedPath);
+        }
+      } catch (_) {}
+
+      // 2. Check standard persistent video_cache directory
+      if (localVideoFile == null) {
+        try {
+          final dir = await getApplicationDocumentsDirectory();
+          final cacheFile = File(p.join(dir.path, 'video_cache', '${url.hashCode}.mp4'));
+          if (cacheFile.existsSync() && cacheFile.lengthSync() > 0) {
+            localVideoFile = cacheFile;
+          }
+        } catch (_) {}
+      }
+
+      // 3. Initialize from local file (0 network usage) or stream via network
+      if (localVideoFile != null && localVideoFile.existsSync()) {
+        _videoPlayerController = VideoPlayerController.file(localVideoFile);
+      } else {
+        final uri = Uri.parse(url);
+        _videoPlayerController = VideoPlayerController.networkUrl(uri);
+      }
+
       await _videoPlayerController.initialize();
 
       _chewieController = ChewieController(

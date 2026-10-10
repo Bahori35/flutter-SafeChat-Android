@@ -147,18 +147,27 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
           controller = VideoPlayerController.networkUrl(uri);
           await controller.initialize();
           
-          // Background save to local file for all future opens
-          HttpClient().getUrl(uri).then((req) => req.close()).then((res) {
+          // Background download remote video safely to local persistent storage
+          HttpClient().getUrl(uri).then((req) => req.close()).then((res) async {
             if (res.statusCode == 200) {
-              res.pipe(cachedTargetFile.openWrite()).then((_) async {
+              final tempFile = File('${cachedTargetFile.path}.tmp');
+              final sink = tempFile.openWrite();
+              await res.pipe(sink);
+              if (await tempFile.exists() && await tempFile.length() > 0) {
+                if (await cachedTargetFile.exists()) {
+                  await cachedTargetFile.delete();
+                }
+                await tempFile.rename(cachedTargetFile.path);
                 _cachedFilePaths[url] = cachedTargetFile.path;
                 try {
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setString('vfile_${url.hashCode}', cachedTargetFile.path);
                 } catch (_) {}
-              });
+              }
             }
-          }).catchError((_) {});
+          }).catchError((e) {
+            debugPrint('[VIDEO CACHE DOWNLOAD ERR] $e');
+          });
         }
       } catch (_) {
         final uri = Uri.parse(url);
