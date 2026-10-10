@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../constants/app_colors.dart';
 import '../video_player_screen.dart';
 
@@ -18,14 +22,20 @@ class VideoMessageBubble extends StatefulWidget {
 }
 
 class _VideoMessageBubbleState extends State<VideoMessageBubble> {
+  // Global memory cache of extracted video thumbnail files and durations
+  static final Map<String, String> _cachedThumbnailPaths = {};
+  static final Map<String, String> _cachedDurations = {};
+
   VideoPlayerController? _controller;
-  bool _isInitialized = false;
+  String? _thumbnailPath;
+  String _durationText = '';
+  bool _isProcessing = true;
   bool _hasError = false;
 
   @override
   void initState() {
     super.initState();
-    _initThumbnail();
+    _loadOrGenerateThumbnail();
   }
 
   @override
@@ -33,41 +43,13 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.videoUrl != widget.videoUrl) {
       _controller?.dispose();
-      _isInitialized = false;
+      _controller = null;
+      _thumbnailPath = null;
+      _durationText = '';
+      _isProcessing = true;
       _hasError = false;
-      _initThumbnail();
+      _loadOrGenerateThumbnail();
     }
-  }
-
-  Future<void> _initThumbnail() async {
-    try {
-      final uri = Uri.parse(widget.videoUrl);
-      final controller = VideoPlayerController.networkUrl(uri);
-      _controller = controller;
-      await controller.initialize();
-      // Seek to 1 second to capture a representative frame
-      if (controller.value.duration.inSeconds > 1) {
-        await controller.seekTo(const Duration(seconds: 1));
-      }
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
-      }
-    } catch (e) {
-      debugPrint('[VIDEO THUMB ERROR] $e');
-      if (mounted) {
-        setState(() {
-          _hasError = true;
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
   }
 
   String _formatDuration(Duration duration) {
@@ -80,12 +62,94 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
     return '$minutes:$seconds';
   }
 
+  Future<void> _loadOrGenerateThumbnail() async {
+    final url = widget.videoUrl;
+
+    // 1. Check in-memory cache first (instant)
+    if (_cachedThumbnailPaths.containsKey(url)) {
+      final cachedPath = _cachedThumbnailPaths[url]!;
+      final cachedDuration = _cachedDurations[url] ?? '';
+      if (File(cachedPath).existsSync()) {
+        if (mounted) {
+          setState(() {
+            _thumbnailPath = cachedPath;
+            _durationText = cachedDuration;
+            _isProcessing = false;
+          });
+        }
+        return;
+      }
+    }
+
+    // 2. Check persistent disk cache
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final diskKey = 'vthumb_${url.hashCode}';
+      final durKey = 'vdur_${url.hashCode}';
+      final savedPath = prefs.getString(diskKey);
+      final savedDuration = prefs.getString(durKey) ?? '';
+
+      if (savedPath != null && File(savedPath).existsSync()) {
+        _cachedThumbnailPaths[url] = savedPath;
+        _cachedDurations[url] = savedDuration;
+        if (mounted) {
+          setState(() {
+            _thumbnailPath = savedPath;
+            _durationText = savedDuration;
+            _isProcessing = false;
+          });
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('[PREF CACHE CHECK ERR] $e');
+    }
+
+    // 3. If not cached, initialize video controller once to capture first frame & duration
+    try {
+      final uri = Uri.parse(url);
+      final controller = VideoPlayerController.networkUrl(uri);
+      _controller = controller;
+      await controller.initialize();
+
+      if (controller.value.duration.inSeconds > 1) {
+        await controller.seekTo(const Duration(seconds: 1));
+      }
+
+      final durText = _formatDuration(controller.value.duration);
+      _cachedDurations[url] = durText;
+
+      // Save duration to persistent disk cache
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('vdur_${url.hashCode}', durText);
+      } catch (_) {}
+
+      if (mounted) {
+        setState(() {
+          _durationText = durText;
+          _isProcessing = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[VIDEO THUMB INITIALIZE ERR] $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _isProcessing = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final durationText = _isInitialized && _controller != null
-        ? _formatDuration(_controller!.value.duration)
-        : '';
-
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -110,8 +174,15 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
           alignment: Alignment.center,
           fit: StackFit.expand,
           children: [
-            // Video Frame First Frame Thumbnail
-            if (_isInitialized && _controller != null)
+            // Display cached image from local disk if available
+            if (_thumbnailPath != null && File(_thumbnailPath!).existsSync())
+              Image.file(
+                File(_thumbnailPath!),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(color: Colors.black26),
+              )
+            // Or display from controller if initialized
+            else if (_controller != null && _controller!.value.isInitialized)
               FittedBox(
                 fit: BoxFit.cover,
                 clipBehavior: Clip.hardEdge,
@@ -130,6 +201,9 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
                     end: Alignment.bottomRight,
                   ),
                 ),
+                child: const Center(
+                  child: Icon(Icons.movie_creation_outlined, color: Colors.white38, size: 48),
+                ),
               )
             else
               Container(
@@ -139,9 +213,9 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
                 ),
               ),
 
-            // Semi-transparent dark overlay for contrast
+            // Semi-transparent dark overlay for high contrast
             Container(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withOpacity(0.28),
             ),
 
             // Center Play Button with glass glow
@@ -166,7 +240,7 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
             ),
 
             // Duration badge at bottom right
-            if (durationText.isNotEmpty)
+            if (_durationText.isNotEmpty)
               Positioned(
                 bottom: 8,
                 right: 8,
@@ -182,7 +256,7 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
                       const Icon(Icons.videocam_rounded, color: Colors.white, size: 12),
                       const SizedBox(width: 4),
                       Text(
-                        durationText,
+                        _durationText,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
