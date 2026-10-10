@@ -866,19 +866,25 @@ class _ChatScreenState extends State<ChatScreen> {
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => LiveLocationScreen(
-              initialPosition: locationPos,
-              peerUser: widget.peerUser,
-              currentUser: widget.currentUser,
-              isMyLiveLocation: isMe,
-              messageId: message.id,
-              onStopSharing: () => _stopLiveLocationSharing(messageId: message.id),
+        if (isLive) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => LiveLocationScreen(
+                initialPosition: locationPos,
+                peerUser: widget.peerUser,
+                currentUser: widget.currentUser,
+                isMyLiveLocation: isMe,
+                messageId: message.id,
+                onStopSharing: () => _stopLiveLocationSharing(messageId: message.id),
+              ),
             ),
-          ),
-        );
+          );
+        } else {
+          if (message.mediaUrl != null && message.mediaUrl!.isNotEmpty) {
+            _openDocument(message.mediaUrl!);
+          }
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(8),

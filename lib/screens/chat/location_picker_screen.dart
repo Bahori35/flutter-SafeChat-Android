@@ -439,7 +439,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       ),
                     ),
 
-                    // Option 1: Send Live / Current Location
+                    // Option 1: Live Location (Continuous dynamic sharing)
                     InkWell(
                       borderRadius: BorderRadius.circular(16),
                       onTap: () {
@@ -447,6 +447,65 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           _selectedLocation = _currentLocation;
                         });
                         _sendSelectedLocation(isLive: true);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.onlineGreen.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.onlineGreen.withOpacity(0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: const BoxDecoration(
+                                color: AppColors.onlineGreen,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.sensors_rounded, color: Colors.white, size: 20),
+                            ),
+                            const SizedBox(width: 14),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Canlı Konum Paylaş',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14.5,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Hareket ettikçe anlık olarak güncellensin',
+                                    style: TextStyle(
+                                      color: AppColors.onlineGreen,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.onlineGreen, size: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Option 2: Send Current GPS Fixed Location (Static)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        setState(() {
+                          _selectedLocation = _currentLocation;
+                        });
+                        _sendSelectedLocation(isLive: false);
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -463,7 +522,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                 gradient: AppColors.primaryGradient,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.near_me_rounded, color: Colors.white, size: 20),
+                              child: const Icon(Icons.my_location_rounded, color: Colors.white, size: 20),
                             ),
                             const SizedBox(width: 14),
                             const Expanded(
@@ -471,7 +530,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Mevcut Konumumu Paylaş',
+                                    'Şu Anki Konumumu Gönder',
                                     style: TextStyle(
                                       color: AppColors.textPrimary,
                                       fontWeight: FontWeight.bold,
@@ -480,7 +539,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                   ),
                                   SizedBox(height: 2),
                                   Text(
-                                    'Tam şu anda bulunduğunuz GPS noktasını gönderin',
+                                    'Bulunduğunuz sabit GPS noktasını yollar (Statik)',
                                     style: TextStyle(
                                       color: AppColors.textSecondary,
                                       fontSize: 12,
@@ -497,7 +556,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
                     const SizedBox(height: 10),
 
-                    // Option 2: Send Marked Pin Location
+                    // Option 3: Send Marked Pin Location (Static)
                     InkWell(
                       borderRadius: BorderRadius.circular(16),
                       onTap: () => _sendSelectedLocation(isLive: false),
@@ -524,7 +583,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    'Bu İşaretlenen Konumu Gönder',
+                                    'Haritada İşaretlenen Konumu Gönder',
                                     style: TextStyle(
                                       color: AppColors.textPrimary,
                                       fontWeight: FontWeight.bold,

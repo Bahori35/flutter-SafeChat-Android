@@ -112,7 +112,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
           setState(() {
             _myLocation = LatLng(position.latitude, position.longitude);
           });
-          if (widget.isMyLiveLocation) {
+          if (widget.isMyLiveLocation && _isLiveActive) {
             _socketService.emitLiveLocationUpdate(
               senderId: widget.currentUser.uid,
               receiverId: widget.peerUser.uid,
@@ -128,6 +128,21 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
     } catch (e) {
       debugPrint('[LIVE GPS ERROR] $e');
     }
+  }
+
+  void _stopSharingAction() {
+    _myGpsSubscription?.cancel();
+    _myGpsSubscription = null;
+    setState(() {
+      _isLiveActive = false;
+    });
+    _socketService.emitStopLiveLocation(
+      senderId: widget.currentUser.uid,
+      receiverId: widget.peerUser.uid,
+      messageId: widget.messageId,
+    );
+    widget.onStopSharing?.call();
+    Navigator.pop(context);
   }
 
   @override
@@ -412,18 +427,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                         ),
                       ),
                       ElevatedButton(
-                        onPressed: () {
-                          _socketService.emitStopLiveLocation(
-                            senderId: widget.currentUser.uid,
-                            receiverId: widget.peerUser.uid,
-                            messageId: widget.messageId,
-                          );
-                          widget.onStopSharing?.call();
-                          setState(() {
-                            _isLiveActive = false;
-                          });
-                          Navigator.pop(context);
-                        },
+                        onPressed: _stopSharingAction,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.callRed,
                           foregroundColor: Colors.white,
