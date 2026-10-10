@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -320,6 +321,91 @@ class _ChatScreenState extends State<ChatScreen> {
     return const Color(0xFF5E35B1);
   }
 
+  // Get current GPS location and send
+  Future<void> _sendCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lütfen cihazınızın konum (GPS) servisini açın.'),
+              backgroundColor: AppColors.callRed,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Konum izni verilmedi.'),
+                backgroundColor: AppColors.callRed,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Konum izni kalıcı olarak reddedildi. Uygulama ayarlarından izin verin.'),
+              backgroundColor: AppColors.callRed,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _isUploadingMedia = true;
+      });
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      final lat = position.latitude;
+      final lng = position.longitude;
+      final mapsUrl = 'https://maps.google.com/?q=$lat,$lng';
+
+      _sendMessage(
+        customContent: '📍 Konum Paylaşıldı\nEnlem: ${lat.toStringAsFixed(6)}, Boylam: ${lng.toStringAsFixed(6)}',
+        type: MessageType.location,
+        mediaUrl: mapsUrl,
+      );
+    } catch (e) {
+      debugPrint('[LOCATION ERROR] $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Konum alınırken bir hata oluştu: $e'),
+            backgroundColor: AppColors.callRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingMedia = false;
+        });
+      }
+    }
+  }
+
   void _showMediaPickerSheet() {
     showModalBottomSheet(
       context: context,
@@ -388,7 +474,15 @@ class _ChatScreenState extends State<ChatScreen> {
                         _pickAndSendMedia(source: ImageSource.gallery, isVideo: true);
                       },
                     ),
-                    const SizedBox(width: 80),
+                    _buildMediaOption(
+                      icon: Icons.location_on_rounded,
+                      label: 'Konum Paylaş',
+                      color: const Color(0xFFFF5722),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _sendCurrentLocation();
+                      },
+                    ),
                   ],
                 ),
               ],
@@ -700,16 +794,133 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildLocationWidget(MessageModel message) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        if (message.mediaUrl != null && message.mediaUrl!.isNotEmpty) {
+          _openDocument(message.mediaUrl!);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.25),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 120,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E3C72), Color(0xFF2A5298)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Grid Pattern Effect
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: 0.15,
+                      child: GridView.builder(
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 6,
+                        ),
+                        itemBuilder: (_, __) => Container(
+                          margin: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.white, width: 0.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF5722),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF5722).withOpacity(0.5),
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.location_on_rounded, color: Colors.white, size: 28),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Haritada Görüntüle',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.pin_drop_rounded, color: Color(0xFFFF5722), size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    message.content.isNotEmpty ? message.content : 'Paylaşılan Konum',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Harita',
+                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageBubble(MessageModel message, bool isMe) {
+    final bool isLocation = message.type == MessageType.location;
     final bool isDoc = message.type == MessageType.doc;
     final bool hasMedia = message.mediaUrl != null && message.mediaUrl!.isNotEmpty;
-    final bool isImage = message.type == MessageType.image || (hasMedia && !isDoc && !message.mediaUrl!.endsWith('.mp4'));
+    final bool isImage = message.type == MessageType.image || (hasMedia && !isDoc && !isLocation && !message.mediaUrl!.endsWith('.mp4'));
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 3.5),
-        padding: EdgeInsets.all(hasMedia && !isDoc ? 4 : 10),
+        padding: EdgeInsets.all(hasMedia && !isDoc && !isLocation ? 4 : 10),
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.78,
         ),
@@ -734,7 +945,9 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            if (isDoc) ...[
+            if (isLocation) ...[
+              _buildLocationWidget(message),
+            ] else if (isDoc) ...[
               _buildDocumentWidget(message),
             ] else if (hasMedia) ...[
               ClipRRect(

@@ -689,6 +689,8 @@ async def send_message(sid, data):
             push_body = "🎥 Video" + (f": {content}" if content and content != '🎥 Video' else "")
         elif msg_type == "doc":
             push_body = f"📄 {content}" if content else "📄 Dosya"
+        elif msg_type == "location":
+            push_body = "📍 Konum Paylaştı"
 
         send_fcm_push(
             user_id=target_uid,
