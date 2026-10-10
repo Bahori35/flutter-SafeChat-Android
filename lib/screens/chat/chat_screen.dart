@@ -254,6 +254,12 @@ class _ChatScreenState extends State<ChatScreen> {
       final mediaUrl = await authService.uploadImage(file.path);
 
       if (mediaUrl != null && mounted) {
+        if (isVideo) {
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('vfile_${mediaUrl.hashCode}', file.path);
+          } catch (_) {}
+        }
         _sendMessage(
           customContent: isVideo ? '🎥 Video' : '📷 Fotoğraf',
           type: isVideo ? MessageType.video : MessageType.image,

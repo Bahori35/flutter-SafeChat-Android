@@ -22,12 +22,12 @@ class VideoMessageBubble extends StatefulWidget {
 }
 
 class _VideoMessageBubbleState extends State<VideoMessageBubble> {
-  // Global memory cache of extracted video thumbnail files and durations
-  static final Map<String, String> _cachedThumbnailPaths = {};
+  // Global memory cache of extracted video files, controllers, and durations
+  static final Map<String, String> _cachedFilePaths = {};
   static final Map<String, String> _cachedDurations = {};
+  static final Map<String, VideoPlayerController> _persistentControllers = {};
 
   VideoPlayerController? _controller;
-  String? _thumbnailPath;
   String _durationText = '';
   bool _isProcessing = true;
   bool _hasError = false;
@@ -42,9 +42,7 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
   void didUpdateWidget(covariant VideoMessageBubble oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.videoUrl != widget.videoUrl) {
-      _controller?.dispose();
       _controller = null;
-      _thumbnailPath = null;
       _durationText = '';
       _isProcessing = true;
       _hasError = false;
@@ -65,15 +63,14 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
   Future<void> _loadOrGenerateThumbnail() async {
     final url = widget.videoUrl;
 
-    // 1. Check in-memory cache first (instant)
-    if (_cachedThumbnailPaths.containsKey(url)) {
-      final cachedPath = _cachedThumbnailPaths[url]!;
-      final cachedDuration = _cachedDurations[url] ?? '';
-      if (File(cachedPath).existsSync()) {
+    // 1. Check if controller already exists in memory pool
+    if (_persistentControllers.containsKey(url)) {
+      final existingController = _persistentControllers[url]!;
+      if (existingController.value.isInitialized) {
         if (mounted) {
           setState(() {
-            _thumbnailPath = cachedPath;
-            _durationText = cachedDuration;
+            _controller = existingController;
+            _durationText = _cachedDurations[url] ?? _formatDuration(existingController.value.duration);
             _isProcessing = false;
           });
         }
@@ -81,36 +78,96 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
       }
     }
 
-    // 2. Check persistent disk cache
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final diskKey = 'vthumb_${url.hashCode}';
-      final durKey = 'vdur_${url.hashCode}';
-      final savedPath = prefs.getString(diskKey);
-      final savedDuration = prefs.getString(durKey) ?? '';
+    // 2. Check local memory/disk file cache (e.g. sender's original file or downloaded file)
+    String? localFilePath = _cachedFilePaths[url];
+    String? cachedDuration = _cachedDurations[url];
 
-      if (savedPath != null && File(savedPath).existsSync()) {
-        _cachedThumbnailPaths[url] = savedPath;
-        _cachedDurations[url] = savedDuration;
+    if (localFilePath == null || !File(localFilePath).existsSync()) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final savedFile = prefs.getString('vfile_${url.hashCode}');
+        final savedDur = prefs.getString('vdur_${url.hashCode}');
+        if (savedFile != null && File(savedFile).existsSync()) {
+          localFilePath = savedFile;
+          _cachedFilePaths[url] = savedFile;
+        }
+        if (savedDur != null && savedDur.isNotEmpty) {
+          cachedDuration = savedDur;
+          _cachedDurations[url] = savedDur;
+        }
+      } catch (e) {
+        debugPrint('[PREF CACHE CHECK ERR] $e');
+      }
+    }
+
+    // If local file is found on phone storage, initialize directly from disk with ZERO network usage!
+    if (localFilePath != null && File(localFilePath).existsSync()) {
+      try {
+        final fileController = VideoPlayerController.file(File(localFilePath));
+        await fileController.initialize();
+        _persistentControllers[url] = fileController;
+        final dur = cachedDuration ?? _formatDuration(fileController.value.duration);
+        _cachedDurations[url] = dur;
+
         if (mounted) {
           setState(() {
-            _thumbnailPath = savedPath;
-            _durationText = savedDuration;
+            _controller = fileController;
+            _durationText = dur;
             _isProcessing = false;
           });
         }
         return;
+      } catch (e) {
+        debugPrint('[LOCAL FILE CONTROLLER ERR] $e');
       }
-    } catch (e) {
-      debugPrint('[PREF CACHE CHECK ERR] $e');
     }
 
-    // 3. If not cached, initialize video controller once to capture first frame & duration
+    // 3. For remote URL: download first or initialize controller once and cache locally
     try {
-      final uri = Uri.parse(url);
-      final controller = VideoPlayerController.networkUrl(uri);
+      // Try to save remote file into persistent app directory so subsequent opens read from disk
+      VideoPlayerController controller;
+      
+      try {
+        final dir = await getApplicationDocumentsDirectory();
+        final cacheDir = Directory(p.join(dir.path, 'video_cache'));
+        if (!cacheDir.existsSync()) {
+          cacheDir.createSync(recursive: true);
+        }
+        final cachedTargetFile = File(p.join(cacheDir.path, '${url.hashCode}.mp4'));
+        
+        if (cachedTargetFile.existsSync() && cachedTargetFile.lengthSync() > 0) {
+          controller = VideoPlayerController.file(cachedTargetFile);
+          await controller.initialize();
+          _cachedFilePaths[url] = cachedTargetFile.path;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('vfile_${url.hashCode}', cachedTargetFile.path);
+        } else {
+          // Initialize via network url once
+          final uri = Uri.parse(url);
+          controller = VideoPlayerController.networkUrl(uri);
+          await controller.initialize();
+          
+          // Background save to local file for all future opens
+          HttpClient().getUrl(uri).then((req) => req.close()).then((res) {
+            if (res.statusCode == 200) {
+              res.pipe(cachedTargetFile.openWrite()).then((_) async {
+                _cachedFilePaths[url] = cachedTargetFile.path;
+                try {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('vfile_${url.hashCode}', cachedTargetFile.path);
+                } catch (_) {}
+              });
+            }
+          }).catchError((_) {});
+        }
+      } catch (_) {
+        final uri = Uri.parse(url);
+        controller = VideoPlayerController.networkUrl(uri);
+        await controller.initialize();
+      }
+
       _controller = controller;
-      await controller.initialize();
+      _persistentControllers[url] = controller;
 
       if (controller.value.duration.inSeconds > 1) {
         await controller.seekTo(const Duration(seconds: 1));
@@ -119,7 +176,6 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
       final durText = _formatDuration(controller.value.duration);
       _cachedDurations[url] = durText;
 
-      // Save duration to persistent disk cache
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('vdur_${url.hashCode}', durText);
@@ -144,7 +200,7 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
 
   @override
   void dispose() {
-    _controller?.dispose();
+    // Keep initialized controller in memory pool so scrolling/re-entering does not re-fetch
     super.dispose();
   }
 
@@ -174,15 +230,8 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
           alignment: Alignment.center,
           fit: StackFit.expand,
           children: [
-            // Display cached image from local disk if available
-            if (_thumbnailPath != null && File(_thumbnailPath!).existsSync())
-              Image.file(
-                File(_thumbnailPath!),
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(color: Colors.black26),
-              )
-            // Or display from controller if initialized
-            else if (_controller != null && _controller!.value.isInitialized)
+            // Display video frame from initialized controller
+            if (_controller != null && _controller!.value.isInitialized)
               FittedBox(
                 fit: BoxFit.cover,
                 clipBehavior: Clip.hardEdge,
