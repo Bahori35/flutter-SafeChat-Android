@@ -15,6 +15,7 @@ import '../../services/custom_auth_service.dart';
 import '../../services/custom_chat_service.dart';
 import '../../services/socket_service.dart';
 import '../call/call_screen.dart';
+import 'location_picker_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -321,88 +322,31 @@ class _ChatScreenState extends State<ChatScreen> {
     return const Color(0xFF5E35B1);
   }
 
-  // Get current GPS location and send
-  Future<void> _sendCurrentLocation() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Lütfen cihazınızın konum (GPS) servisini açın.'),
-              backgroundColor: AppColors.callRed,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        return;
+  // Open WhatsApp-like interactive Location Picker Map Screen
+  Future<void> _openLocationPicker() async {
+    final result = await Navigator.push<LocationPickerResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const LocationPickerScreen(),
+      ),
+    );
+
+    if (result != null && mounted) {
+      final mapsUrl = 'https://maps.google.com/?q=${result.latitude},${result.longitude}';
+      final isLive = result.isLive;
+      
+      String content;
+      if (isLive) {
+        content = '📍 Mevcut Canlı Konum\n${result.address}';
+      } else {
+        content = '📌 ${result.title}\n${result.address}';
       }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Konum izni verilmedi.'),
-                backgroundColor: AppColors.callRed,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Konum izni kalıcı olarak reddedildi. Uygulama ayarlarından izin verin.'),
-              backgroundColor: AppColors.callRed,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        return;
-      }
-
-      setState(() {
-        _isUploadingMedia = true;
-      });
-
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
-
-      final lat = position.latitude;
-      final lng = position.longitude;
-      final mapsUrl = 'https://maps.google.com/?q=$lat,$lng';
 
       _sendMessage(
-        customContent: '📍 Konum Paylaşıldı\nEnlem: ${lat.toStringAsFixed(6)}, Boylam: ${lng.toStringAsFixed(6)}',
+        customContent: content,
         type: MessageType.location,
         mediaUrl: mapsUrl,
       );
-    } catch (e) {
-      debugPrint('[LOCATION ERROR] $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Konum alınırken bir hata oluştu: $e'),
-            backgroundColor: AppColors.callRed,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUploadingMedia = false;
-        });
-      }
     }
   }
 
@@ -476,11 +420,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     _buildMediaOption(
                       icon: Icons.location_on_rounded,
-                      label: 'Konum Paylaş',
+                      label: 'Konum',
                       color: const Color(0xFFFF5722),
                       onTap: () {
                         Navigator.pop(ctx);
-                        _sendCurrentLocation();
+                        _openLocationPicker();
                       },
                     ),
                   ],
