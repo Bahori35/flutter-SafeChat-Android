@@ -750,6 +750,26 @@ async def message_read(sid, data):
 
 
 @sio.event
+async def live_location_update(sid, data):
+    receiver_id = data.get("receiverId")
+    sender_id = data.get("senderId")
+    if receiver_id:
+        receiver_sid = active_sockets.get(str(receiver_id))
+        if receiver_sid:
+            await sio.emit("live_location_received", data, to=receiver_sid)
+
+
+@sio.event
+async def stop_live_location(sid, data):
+    receiver_id = data.get("receiverId")
+    sender_id = data.get("senderId")
+    if receiver_id:
+        receiver_sid = active_sockets.get(str(receiver_id))
+        if receiver_sid:
+            await sio.emit("live_location_stopped", data, to=receiver_sid)
+
+
+@sio.event
 async def call_user(sid, data):
     print(f"[SOCKET] call_user tetiklendi: {data.get('callType')} -> Receiver: {data.get('receiverId')}")
     receiver_id = data.get("receiverId")

@@ -13,6 +13,8 @@ typedef OnCallAnswered = void Function(Map<String, dynamic> answerData);
 typedef OnIceCandidate = void Function(Map<String, dynamic> candidateData);
 typedef OnCallEnded = void Function();
 typedef OnUserStatusChange = void Function(String userId, bool isOnline);
+typedef OnLiveLocationUpdate = void Function(Map<String, dynamic> data);
+typedef OnLiveLocationStopped = void Function(Map<String, dynamic> data);
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
@@ -30,6 +32,8 @@ class SocketService {
   OnIceCandidate? onIceCandidate;
   OnCallEnded? onCallEnded;
   OnUserStatusChange? onUserStatusChange;
+  OnLiveLocationUpdate? onLiveLocationUpdate;
+  OnLiveLocationStopped? onLiveLocationStopped;
 
 
   // Initialize and connect socket to Python server
@@ -139,6 +143,20 @@ class SocketService {
       }
     });
 
+    socket!.on('live_location_received', (data) {
+      debugPrint('[SOCKET] Live Location Received: $data');
+      if (onLiveLocationUpdate != null && data != null) {
+        onLiveLocationUpdate!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('live_location_stopped', (data) {
+      debugPrint('[SOCKET] Live Location Stopped: $data');
+      if (onLiveLocationStopped != null && data != null) {
+        onLiveLocationStopped!(Map<String, dynamic>.from(data));
+      }
+    });
+
     socket!.onDisconnect((_) => debugPrint('[SOCKET] Disconnected'));
   }
 
@@ -157,6 +175,40 @@ class SocketService {
       'senderId': senderId,
       'receiverId': receiverId,
       'messageId': messageId,
+    });
+  }
+
+  // Live Location Update
+  void emitLiveLocationUpdate({
+    required String senderId,
+    required String receiverId,
+    required double latitude,
+    required double longitude,
+    double? heading,
+    double? speed,
+    String? messageId,
+  }) {
+    socket?.emit('live_location_update', {
+      'senderId': senderId,
+      'receiverId': receiverId,
+      'latitude': latitude,
+      'longitude': longitude,
+      'heading': heading ?? 0.0,
+      'speed': speed ?? 0.0,
+      if (messageId != null) 'messageId': messageId,
+    });
+  }
+
+  // Stop Live Location
+  void emitStopLiveLocation({
+    required String senderId,
+    required String receiverId,
+    String? messageId,
+  }) {
+    socket?.emit('stop_live_location', {
+      'senderId': senderId,
+      'receiverId': receiverId,
+      if (messageId != null) 'messageId': messageId,
     });
   }
 
