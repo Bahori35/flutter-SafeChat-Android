@@ -37,6 +37,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   late LatLng _selectedLocation;
   bool _isLoadingGps = true;
   bool _isSearchingAddress = false;
+  bool _isSheetExpanded = false; // Collapsed by default so user can clearly see map & pin
   String _selectedAddress = 'Konum alınıyor...';
   String _selectedTitle = 'Konumunuz';
 
@@ -405,13 +406,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             ),
           ),
 
-          // Bottom Action Sheet (WhatsApp Style)
+          // Bottom Action Sheet (Collapsible / Expandable)
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -428,127 +431,59 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Handle bar
-                    Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardBorder,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-
-                    // Option 1: Live Location (Continuous dynamic sharing)
-                    InkWell(
-                      borderRadius: BorderRadius.circular(16),
+                    // Clickable Drag / Toggle Header
+                    GestureDetector(
                       onTap: () {
                         setState(() {
-                          _selectedLocation = _currentLocation;
+                          _isSheetExpanded = !_isSheetExpanded;
                         });
-                        _sendSelectedLocation(isLive: true);
                       },
+                      behavior: HitTestBehavior.opaque,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.onlineGreen.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.onlineGreen.withOpacity(0.4)),
-                        ),
-                        child: Row(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Column(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: const BoxDecoration(
-                                color: AppColors.onlineGreen,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.sensors_rounded, color: Colors.white, size: 20),
-                            ),
-                            const SizedBox(width: 14),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Canlı Konum Paylaş',
-                                    style: TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14.5,
-                                    ),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Hareket ettikçe anlık olarak güncellensin',
-                                    style: TextStyle(
-                                      color: AppColors.onlineGreen,
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.onlineGreen, size: 16),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // Option 2: Send Current GPS Fixed Location (Static)
-                    InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () {
-                        setState(() {
-                          _selectedLocation = _currentLocation;
-                        });
-                        _sendSelectedLocation(isLive: false);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
+                              width: 44,
+                              height: 5,
                               decoration: BoxDecoration(
-                                gradient: AppColors.primaryGradient,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.my_location_rounded, color: Colors.white, size: 20),
-                            ),
-                            const SizedBox(width: 14),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Şu Anki Konumumu Gönder',
-                                    style: TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14.5,
-                                    ),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Bulunduğunuz sabit GPS noktasını yollar (Statik)',
-                                    style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
+                                color: AppColors.cardBorder.withOpacity(0.8),
+                                borderRadius: BorderRadius.circular(3),
                               ),
                             ),
-                            const Icon(Icons.send_rounded, color: AppColors.accent, size: 20),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _isSheetExpanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
+                                      color: AppColors.primaryLight,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _isSheetExpanded ? 'Seçenekleri Gizle' : 'Tüm Konum Seçenekleri',
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  _isSheetExpanded ? 'Haritayı Gör' : 'Seçenekleri Aç',
+                                  style: const TextStyle(
+                                    color: AppColors.primaryLight,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -556,59 +491,183 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
                     const SizedBox(height: 10),
 
-                    // Option 3: Send Marked Pin Location (Static)
+                    // Primary Action Button (Always Visible): Send Currently Selected / Marked Location
                     InkWell(
                       borderRadius: BorderRadius.circular(16),
                       onTap: () => _sendSelectedLocation(isLive: false),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFF5722).withOpacity(0.12),
+                          color: const Color(0xFFFF5722),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFFF5722).withOpacity(0.4)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF5722).withOpacity(0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
                         child: Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFFF5722),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(Icons.pin_drop_rounded, color: Colors.white, size: 20),
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    'Haritada İşaretlenen Konumu Gönder',
+                                    'İşaretlenen Konumu Gönder',
                                     style: TextStyle(
-                                      color: AppColors.textPrimary,
+                                      color: Colors.white,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14.5,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
                                   Text(
                                     _selectedTitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFFFF7043),
-                                      fontWeight: FontWeight.w500,
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.9),
                                       fontSize: 12,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFFF5722), size: 16),
+                            const Icon(Icons.send_rounded, color: Colors.white, size: 20),
                           ],
                         ),
                       ),
                     ),
+
+                    // Expanded Options: Live location & Current GPS location
+                    if (_isSheetExpanded) ...[
+                      const SizedBox(height: 10),
+
+                      // Option 1: Live Location
+                      InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          setState(() {
+                            _selectedLocation = _currentLocation;
+                          });
+                          _sendSelectedLocation(isLive: true);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: AppColors.onlineGreen.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.onlineGreen.withOpacity(0.4)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.onlineGreen,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.sensors_rounded, color: Colors.white, size: 20),
+                              ),
+                              const SizedBox(width: 14),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Canlı Konum Paylaş',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Hareket ettikçe anlık olarak güncellensin',
+                                      style: TextStyle(
+                                        color: AppColors.onlineGreen,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 11.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.onlineGreen, size: 16),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Option 2: Send Current GPS Fixed Location (Static)
+                      InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          setState(() {
+                            _selectedLocation = _currentLocation;
+                          });
+                          _sendSelectedLocation(isLive: false);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  gradient: AppColors.primaryGradient,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.my_location_rounded, color: Colors.white, size: 20),
+                              ),
+                              const SizedBox(width: 14),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Şu Anki Konumumu Gönder',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Bulunduğunuz sabit GPS noktasını yollar (Statik)',
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 11.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.send_rounded, color: AppColors.accent, size: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
