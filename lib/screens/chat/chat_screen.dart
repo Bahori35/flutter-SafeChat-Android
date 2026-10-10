@@ -19,6 +19,7 @@ import '../../services/socket_service.dart';
 import '../call/call_screen.dart';
 import 'location_picker_screen.dart';
 import 'live_location_screen.dart';
+import 'video_player_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -1106,20 +1107,98 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                       )
-                    : Container(
-                        height: 180,
-                        color: Colors.black26,
-                        child: const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircleAvatar(
-                                radius: 28,
-                                backgroundColor: AppColors.accent,
-                                child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 36),
+                    : GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => VideoPlayerScreen(
+                                videoUrl: message.mediaUrl!,
+                                title: message.content.isNotEmpty && message.content != '🎥 Video'
+                                    ? message.content
+                                    : 'Video Oynatıcı',
                               ),
-                              SizedBox(height: 8),
-                              Text('Video Mesajı', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          height: 190,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(12),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF141E30), Color(0xFF243B55)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Background pattern / film strip effect
+                              Positioned.fill(
+                                child: Opacity(
+                                  opacity: 0.15,
+                                  child: GridView.builder(
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 5,
+                                    ),
+                                    itemBuilder: (_, __) => Container(
+                                      margin: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.white, width: 0.5),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 58,
+                                    height: 58,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: AppColors.primaryGradient,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.primary.withOpacity(0.5),
+                                          blurRadius: 14,
+                                          spreadRadius: 2,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 38),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black45,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.videocam_rounded, color: Colors.white70, size: 14),
+                                        SizedBox(width: 5),
+                                        Text(
+                                          'Videoyu Oynat',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
                         ),

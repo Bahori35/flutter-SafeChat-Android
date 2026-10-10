@@ -40,6 +40,8 @@ dependencies:
   geolocator: ^12.0.0
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
+  video_player: ^2.9.2
+  chewie: ^1.8.5
 
 
 
